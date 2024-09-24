@@ -1,0 +1,29 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "f077a581922227750dd4f65a5b854edd"
+name = "Super Discount"
+handle = "local-discount-code"
+application_url = "https://mobile-magnet-jimmy-diverse.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "test-partner-inc.myshopify.com"
+include_config_on_deploy = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_discounts,read_markets,write_discounts"
+
+[auth]
+redirect_urls = [
+  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/auth/callback",
+  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/auth/shopify/callback",
+  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-07"
+
+[pos]
+embedded = false
