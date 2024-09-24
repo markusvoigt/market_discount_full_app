@@ -3,7 +3,7 @@
 client_id = "f077a581922227750dd4f65a5b854edd"
 name = "Super Discount"
 handle = "local-discount-code"
-application_url = "https://mobile-magnet-jimmy-diverse.trycloudflare.com"
+application_url = "https://local-discount-7f56ebea56bb.herokuapp.com"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "read_discounts,read_markets,write_discounts"
 
 [auth]
 redirect_urls = [
-  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/auth/callback",
-  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/auth/shopify/callback",
-  "https://mobile-magnet-jimmy-diverse.trycloudflare.com/api/auth/callback"
+  "https://local-discount-7f56ebea56bb.herokuapp.com/auth/callback",
+  "https://local-discount-7f56ebea56bb.herokuapp.com/auth/shopify/callback",
+  "https://local-discount-7f56ebea56bb.herokuapp.com/api/auth/callback"
 ]
 
 [webhooks]
