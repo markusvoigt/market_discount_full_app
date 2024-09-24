@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { json } from "@remix-run/node";
 import { useForm, useField, asChoiceField } from "@shopify/react-form";
  import { CurrencyCode } from "@shopify/react-i18n";
@@ -123,7 +123,7 @@ export const action = async ({ params, request }) => {
       ownerId: discountId,
       type: "json",
       value: JSON.stringify({
-        oncePerOrder: config.oncePerOrder,
+        oncePerOrder: configuration.oncePerOrder,
         selectedMarkets: configuration.availableInMarkets,
         excludeLineItemsOnSale: configuration.excludeItemsOnSale,
         percentage: configuration.percentageDiscountValue || 0,
@@ -325,12 +325,12 @@ export default function VolumeNew() {
 
   return (
     <Page>
-      <ui-title-bar title="Create local discount">
+      <ui-title-bar title="Edit discount">
         <button variant="breadcrumb" onClick={returnToDiscounts}>
           Discounts
         </button>
         <button variant="primary" onClick={submit}>
-          Save discount
+          Update discount
         </button>
       </ui-title-bar>
       <Layout>
