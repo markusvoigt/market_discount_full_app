@@ -9,9 +9,11 @@ node_modules
 /prisma/dev.sqlite
 /prisma/dev.sqlite-journal
 database.sqlite
+/extensions/local-discount
 
 .env
 .env.*
+.gitignore
 
 
 yarn.lock

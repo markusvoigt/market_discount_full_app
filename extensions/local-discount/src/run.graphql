@@ -1,7 +1,0 @@
-query RunInput {
-  discountNode {
-    metafield(namespace: "$app:local-discount", key: "function-configuration") {
-      value
-    }
-  }
-}
