@@ -1,0 +1,33 @@
+query Input {
+  cart {
+    lines {
+      id
+      quantity
+      cost {
+        subtotalAmount {
+          amount
+        }
+        compareAtAmountPerQuantity {
+          amount
+        }
+      }
+    }
+  }
+  localization {
+    country {
+      isoCode
+    }
+    market {
+      id
+    }
+  }
+  discount {
+    discountClasses
+    configuration: metafield(
+      namespace: "$app:example-discounts--ui-extension"
+      key: "function-configuration"
+    ) {
+      value
+    }
+  }
+}
