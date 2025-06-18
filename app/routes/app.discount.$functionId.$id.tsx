@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { Page } from "@shopify/polaris";
-import { Collection, DiscountClass } from "app/types/admin.types";
+import { Collection, DiscountClass } from "../types/admin.types.d";
 
 import { DiscountForm } from "../components/DiscountForm/DiscountForm";
 import { NotFoundPage } from "../components/NotFoundPage";
@@ -165,6 +165,7 @@ export default function VolumeEdit() {
       collectionIds: rawDiscount.configuration.collectionIds || [],
       markets: rawDiscount.configuration.markets || [],
     },
+    discountType: rawDiscount.discountClasses.includes(DiscountClass.Shipping) ? "shipping" : "products_order",
   };
 
   return (

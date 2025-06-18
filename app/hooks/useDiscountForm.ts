@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 
 import { DiscountClass } from "../types/admin.types.d";
 import { DiscountMethod } from "../types/types";
-import { MarketConfig } from "../types/form.types";
+import { MarketConfig, DiscountType } from "../types/form.types";
 
 interface Collection {
   id: string;
@@ -22,70 +22,92 @@ interface DiscountConfiguration {
   markets?: MarketConfig[];
 }
 
-export interface FormState {
+interface FormState {
   title: string;
   method: DiscountMethod;
   code: string;
-  combinesWith: CombinesWith;
+  combinesWith: {
+    orderDiscounts: boolean;
+    productDiscounts: boolean;
+    shippingDiscounts: boolean;
+  };
   discountClasses: DiscountClass[];
+  discountType: DiscountType;
   usageLimit: string;
   appliesOncePerCustomer: boolean;
-  startDate: Date | string;
-  endDate: Date | string | null;
-  configuration: DiscountConfiguration;
+  startDate: string | Date;
+  endDate: string | Date | null;
+  configuration: {
+    metafieldId?: string;
+    collectionIds?: string[];
+    markets?: MarketConfig[];
+  };
 }
 
 interface UseDiscountFormProps {
-  initialData?: {
-    title: string;
-    method: DiscountMethod;
-    code: string;
-    combinesWith: {
-      orderDiscounts: boolean;
-      productDiscounts: boolean;
-      shippingDiscounts: boolean;
-    };
-    discountClasses: DiscountClass[];
-    usageLimit: number | null;
-    appliesOncePerCustomer: boolean;
-    startsAt: string | Date;
-    endsAt: string | Date | null;
-    configuration: {
-      metafieldId?: string;
-      collectionIds?: string[];
-      markets?: MarketConfig[];
-    };
-  };
-  onSubmit?: () => void;
+  initialData?: Partial<FormState>;
 }
+
+const defaultFormState: FormState = {
+  title: "",
+  method: DiscountMethod.Code,
+  code: "",
+  combinesWith: {
+    orderDiscounts: false,
+    productDiscounts: false,
+    shippingDiscounts: false,
+  },
+  discountClasses: [],
+  discountType: "products_order",
+  usageLimit: "",
+  appliesOncePerCustomer: false,
+  startDate: new Date(),
+  endDate: null,
+  configuration: {
+    markets: [],
+  },
+};
 
 export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
   const submit = useSubmit();
   const todaysDate = new Date();
 
-  const [formState, setFormState] = useState<FormState>(() => ({
-    title: initialData?.title ?? "",
-    method: initialData?.method ?? DiscountMethod.Code,
-    code: initialData?.code ?? "",
-    discountClasses: initialData?.discountClasses ?? [DiscountClass.Product],
-    combinesWith: initialData?.combinesWith ?? {
-      orderDiscounts: false,
-      productDiscounts: false,
-      shippingDiscounts: false,
-    },
-    usageLimit: initialData?.usageLimit?.toString() ?? "",
-    appliesOncePerCustomer: initialData?.appliesOncePerCustomer ?? false,
-    startDate: initialData?.startsAt ?? todaysDate,
-    endDate: initialData?.endsAt ?? null,
-    configuration: {
-      metafieldId: initialData?.configuration?.metafieldId,
-      markets: initialData?.configuration?.markets ?? [],
-    },
-  }));
+  const [formState, setFormState] = useState<FormState>(() => {
+    const discountType = initialData?.discountType ?? defaultFormState.discountType;
+    const discountClasses = discountType === "shipping"
+      ? [DiscountClass.Shipping]
+      : [DiscountClass.Product, DiscountClass.Order];
+
+    return {
+      ...defaultFormState,
+      ...initialData,
+      // Ensure type safety for nullable fields
+      usageLimit: initialData?.usageLimit?.toString() ?? defaultFormState.usageLimit,
+      startDate: initialData?.startDate ?? defaultFormState.startDate,
+      endDate: initialData?.endDate ?? defaultFormState.endDate,
+      discountClasses,
+      configuration: {
+        metafieldId: initialData?.configuration?.metafieldId,
+        markets: initialData?.configuration?.markets ?? defaultFormState.configuration.markets,
+      },
+    };
+  });
 
   const setField = useCallback(
     <K extends keyof FormState>(field: K, value: FormState[K]) => {
-      setFormState((prev) => ({ ...prev, [field]: value }));
+      setFormState((prev) => {
+        const updates = { [field]: value } as Pick<FormState, K>;
+        
+        // If changing discount type, update discount classes
+        if (field === "discountType") {
+          const type = value as DiscountType;
+          (updates as any).discountClasses = type === "shipping" 
+            ? [DiscountClass.Shipping]
+            : [DiscountClass.Product, DiscountClass.Order];
+        }
+        
+        return { ...prev, ...updates };
+      });
     },
     [],
   );

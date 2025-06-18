@@ -5,7 +5,7 @@ import {
 } from "../generated/api";
 
 /**
- * @typedef {import("../generated/api").CartInput} RunInput
+ * @typedef {import("../generated/api").CartLineDiscountInput} RunInput
  * @typedef {import("../generated/api").CartLinesDiscountsGenerateRunResult} CartLinesDiscountsGenerateRunResult
  */
 
@@ -51,38 +51,22 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   let marketConfig = null;
   if (Array.isArray(config.markets)) {
-    // Try to match by country code first
-    if (input.localization?.country?.isoCode) {
-      const countryCode = input.localization.country.isoCode;
-      marketConfig = config.markets.find((m) => {
-        // For Canada (CA), look for a market with "Canada" in the name
-        if (
-          countryCode === "CA" &&
-          m.marketName.includes("Canada") &&
-          m.active
-        ) {
-          return true;
-        }
-        // For Germany (DE), look for a market with "Germany" in the name
-        if (
-          countryCode === "DE" &&
-          m.marketName.includes("Germany") &&
-          m.active
-        ) {
-          return true;
-        }
-        return false;
-      });
-    }
-
-    // If no match by country code, try market ID if available
-    if (!marketConfig && input.localization?.market?.id) {
+    // First try to match by market ID as it's the most precise identifier
+    if (input.localization?.market?.id) {
       marketConfig = config.markets.find(
         (m) => m.marketId === input.localization.market.id && m.active
       );
     }
 
-    // Fallback to currencyCode if no market match
+    // If no match by market ID, try country code
+    if (!marketConfig && input.localization?.country?.isoCode) {
+      const countryCode = input.localization.country.isoCode;
+      marketConfig = config.markets.find(
+        (m) => m.countryCode === countryCode && m.active
+      );
+    }
+
+    // Last resort: try to match by currency if available
     if (!marketConfig && presentmentCurrency) {
       marketConfig = config.markets.find(
         (m) => m.currencyCode === presentmentCurrency && m.active
@@ -177,17 +161,18 @@ export function cartLinesDiscountsGenerateRun(input) {
       if (eligibleLines.length > 0) {
         operations.push({
           productDiscountsAdd: {
-            candidates: [
-              {
-                message,
-                targets: eligibleLines.map((line) => ({
+            // Create separate candidates for each line to ensure fixed amount is applied per line
+            candidates: eligibleLines.map((line) => ({
+              message: message,
+              targets: [
+                {
                   cartLine: {
                     id: line.id,
                   },
-                })),
-                value,
-              },
-            ],
+                },
+              ],
+              value,
+            })),
             selectionStrategy: ProductDiscountSelectionStrategy.All,
           },
         });

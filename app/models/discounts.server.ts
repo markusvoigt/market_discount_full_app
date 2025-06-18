@@ -153,17 +153,8 @@ export async function updateCodeDiscount(
   appliesOncePerCustomer: boolean,
   configuration: {
     metafieldId: string;
-    cartLinePercentage: number;
-    cartLineFixed: number;
-    cartLineType: 'percentage' | 'fixed';
-    orderPercentage: number;
-    orderFixed: number;
-    orderType: 'percentage' | 'fixed';
-    deliveryPercentage: number;
-    deliveryFixed: number;
-    deliveryType: 'percentage' | 'fixed';
     collectionIds?: string[];
-    markets?: string[];
+    markets?: any[];
   },
 ) {
   const { admin } = await authenticate.admin(request);
@@ -207,17 +198,8 @@ export async function updateAutomaticDiscount(
   baseDiscount: BaseDiscount,
   configuration: {
     metafieldId: string;
-    cartLinePercentage: number;
-    cartLineFixed: number;
-    cartLineType: 'percentage' | 'fixed';
-    orderPercentage: number;
-    orderFixed: number;
-    orderType: 'percentage' | 'fixed';
-    deliveryPercentage: number;
-    deliveryFixed: number;
-    deliveryType: 'percentage' | 'fixed';
     collectionIds?: string[];
-    markets?: string[];
+    markets?: any[];
   },
 ) {
   const { admin } = await authenticate.admin(request);

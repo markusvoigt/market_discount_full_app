@@ -40,21 +40,15 @@ function cartLinesDiscountsGenerateRun(input) {
   console.log("Presentment currency:", presentmentCurrency);
   let marketConfig = null;
   if (Array.isArray(config.markets)) {
-    if (input.localization?.country?.isoCode) {
-      const countryCode = input.localization.country.isoCode;
-      marketConfig = config.markets.find((m) => {
-        if (countryCode === "CA" && m.marketName.includes("Canada") && m.active) {
-          return true;
-        }
-        if (countryCode === "DE" && m.marketName.includes("Germany") && m.active) {
-          return true;
-        }
-        return false;
-      });
-    }
-    if (!marketConfig && input.localization?.market?.id) {
+    if (input.localization?.market?.id) {
       marketConfig = config.markets.find(
         (m) => m.marketId === input.localization.market.id && m.active
+      );
+    }
+    if (!marketConfig && input.localization?.country?.isoCode) {
+      const countryCode = input.localization.country.isoCode;
+      marketConfig = config.markets.find(
+        (m) => m.countryCode === countryCode && m.active
       );
     }
     if (!marketConfig && presentmentCurrency) {
@@ -134,17 +128,18 @@ function cartLinesDiscountsGenerateRun(input) {
       if (eligibleLines.length > 0) {
         operations.push({
           productDiscountsAdd: {
-            candidates: [
-              {
-                message,
-                targets: eligibleLines.map((line) => ({
+            // Create separate candidates for each line to ensure fixed amount is applied per line
+            candidates: eligibleLines.map((line) => ({
+              message,
+              targets: [
+                {
                   cartLine: {
                     id: line.id
                   }
-                })),
-                value
-              }
-            ],
+                }
+              ],
+              value
+            })),
             selectionStrategy: "ALL" /* All */
           }
         });
@@ -169,29 +164,30 @@ function cartDeliveryOptionsDiscountsGenerateRun(input) {
     return { operations: [] };
   }
   let config = {};
-  if (input.discount.configuration && input.discount.configuration.value) {
+  if (input.discount.metafield?.value) {
     try {
-      config = JSON.parse(input.discount.configuration.value);
+      config = JSON.parse(input.discount.metafield.value);
     } catch (e) {
+      console.error("Failed to parse metafield configuration:", e);
       config = {};
     }
   }
-  const countryIsoCode = input.localization?.country?.isoCode;
-  const presentmentCurrency = input.cart?.buyerIdentity?.presentmentCurrencyCode || input.cart?.presentmentCurrencyCode;
   let marketConfig = null;
   if (Array.isArray(config.markets)) {
-    if (countryIsoCode) {
+    if (input.localization?.market?.id) {
       marketConfig = config.markets.find(
-        (m) => m.marketId === countryIsoCode && m.active
+        (m) => m.marketId === input.localization.market.id && m.active
       );
     }
-    if (!marketConfig && presentmentCurrency) {
+    if (!marketConfig && input.localization?.country?.isoCode) {
+      const countryCode = input.localization.country.isoCode;
       marketConfig = config.markets.find(
-        (m) => m.currencyCode === presentmentCurrency && m.active
+        (m) => m.countryCode === countryCode && m.active
       );
     }
   }
   if (!marketConfig) {
+    console.log("No matching market configuration found");
     return { operations: [] };
   }
   const deliveryType = marketConfig.deliveryType || "percentage";
@@ -201,39 +197,37 @@ function cartDeliveryOptionsDiscountsGenerateRun(input) {
   };
   const deliveryPercentage = safeNumber(marketConfig.deliveryPercentage);
   const deliveryFixed = safeNumber(marketConfig.deliveryFixed);
-  const value = deliveryType === "fixed" && deliveryFixed > 0 ? { fixedAmount: { value: deliveryFixed } } : deliveryPercentage > 0 ? { percentage: { value: deliveryPercentage } } : null;
-  if (!value) {
-    return { operations: [] };
-  }
-  const currencySymbol = presentmentCurrency ? getCurrencySymbol(presentmentCurrency) : "$";
-  function getCurrencySymbol(code) {
-    const symbols = {
-      USD: "$",
-      EUR: "\u20AC",
-      GBP: "\xA3",
-      CAD: "$",
-      AUD: "$",
-      JPY: "\xA5"
+  const candidates = firstDeliveryGroup.deliveryOptions.map((option) => {
+    let value, message;
+    if (deliveryType === "fixed" && deliveryFixed > 0) {
+      value = { fixedAmount: { amount: deliveryFixed.toFixed(2) } };
+      message = `${deliveryFixed} ${option.cost.currencyCode} OFF DELIVERY`;
+    } else if (deliveryPercentage > 0) {
+      value = { percentage: { value: deliveryPercentage } };
+      message = `${deliveryPercentage}% OFF DELIVERY`;
+    } else {
+      return null;
+    }
+    return {
+      message,
+      targets: [
+        {
+          deliveryOption: {
+            handle: option.handle
+          }
+        }
+      ],
+      value
     };
-    return symbols[code] || code;
+  }).filter(Boolean);
+  if (candidates.length === 0) {
+    return { operations: [] };
   }
   return {
     operations: [
       {
         deliveryDiscountsAdd: {
-          candidates: [
-            {
-              message: value.fixedAmount ? `${value.fixedAmount.value}${currencySymbol} OFF DELIVERY` : `${value.percentage.value}% OFF DELIVERY`,
-              targets: [
-                {
-                  deliveryGroup: {
-                    id: firstDeliveryGroup.id
-                  }
-                }
-              ],
-              value
-            }
-          ],
+          candidates,
           selectionStrategy: "ALL" /* All */
         }
       }

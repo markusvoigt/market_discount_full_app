@@ -1,10 +1,32 @@
-query DeliveryInput {
+query DeliveryDiscountInput {
   cart {
     deliveryGroups {
       id
+      deliveryOptions {
+        handle
+        title
+        cost {
+          amount
+          currencyCode
+        }
+      }
     }
   }
   discount {
     discountClasses
+    metafield(
+      namespace: "$app:example-discounts--ui-extension"
+      key: "function-configuration"
+    ) {
+      value
+    }
+  }
+  localization {
+    country {
+      isoCode
+    }
+    market {
+      id
+    }
   }
 }

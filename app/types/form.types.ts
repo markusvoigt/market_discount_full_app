@@ -1,5 +1,7 @@
-import { DiscountClass } from "./admin.types";
+import { DiscountClass } from "./admin.types.d";
 import { DiscountMethod } from "./types";
+
+export type DiscountType = "products_order" | "shipping";
 
 interface CombinesWith {
   orderDiscounts: boolean;
@@ -12,9 +14,9 @@ export interface MarketConfig {
   marketName: string;
   currencyCode: string;
   startDate?: string;
-  endDate?: string;
+  endDate?: string | null;
   excludeOnSale?: boolean;
-  active?: boolean;
+  active: boolean;
   cartLineType: 'percentage' | 'fixed';
   cartLinePercentage: string;
   cartLineFixed: string;
@@ -28,6 +30,7 @@ export interface MarketConfig {
 
 interface DiscountConfiguration {
   metafieldId?: string;
+  collectionIds?: string[];
   markets?: MarketConfig[];
 }
 
@@ -37,9 +40,10 @@ export interface FormState {
   code: string;
   combinesWith: CombinesWith;
   discountClasses: DiscountClass[];
+  discountType: DiscountType;
   usageLimit: string;
   appliesOncePerCustomer: boolean;
-  startDate: Date | string;
-  endDate: Date | string | null;
+  startDate: string | Date;
+  endDate: string | Date | null;
   configuration: DiscountConfiguration;
 }

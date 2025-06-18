@@ -4,7 +4,7 @@ import {
 } from "../generated/api";
 
 /**
- * @typedef {import("../generated/api").DeliveryInput} RunInput
+ * @typedef {import("../generated/api").DeliveryDiscountInput} RunInput
  * @typedef {import("../generated/api").CartDeliveryOptionsDiscountsGenerateRunResult} CartDeliveryOptionsDiscountsGenerateRunResult
  */
 
@@ -12,7 +12,6 @@ import {
  * @param {RunInput} input
  * @returns {CartDeliveryOptionsDiscountsGenerateRunResult}
  */
-
 export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   const firstDeliveryGroup = input.cart.deliveryGroups[0];
   if (!firstDeliveryGroup) {
@@ -28,36 +27,38 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
 
   let config = {};
-  if (input.discount.configuration && input.discount.configuration.value) {
+  if (input.discount.metafield?.value) {
     try {
-      config = JSON.parse(input.discount.configuration.value);
+      config = JSON.parse(input.discount.metafield.value);
     } catch (e) {
+      console.error("Failed to parse metafield configuration:", e);
       config = {};
     }
   }
 
-  // Determine market from input.localization
-  const countryIsoCode = input.localization?.country?.isoCode;
-  const presentmentCurrency =
-    input.cart?.buyerIdentity?.presentmentCurrencyCode ||
-    input.cart?.presentmentCurrencyCode;
   let marketConfig = null;
   if (Array.isArray(config.markets)) {
-    if (countryIsoCode) {
+    // First try to match by market ID as it's the most precise identifier
+    if (input.localization?.market?.id) {
       marketConfig = config.markets.find(
-        (m) => m.marketId === countryIsoCode && m.active
+        (m) => m.marketId === input.localization.market.id && m.active
       );
     }
-    // Fallback to currencyCode if no id match
-    if (!marketConfig && presentmentCurrency) {
+
+    // If no match by market ID, try country code
+    if (!marketConfig && input.localization?.country?.isoCode) {
+      const countryCode = input.localization.country.isoCode;
       marketConfig = config.markets.find(
-        (m) => m.currencyCode === presentmentCurrency && m.active
+        (m) => m.countryCode === countryCode && m.active
       );
     }
   }
+
   if (!marketConfig) {
+    console.log("No matching market configuration found");
     return { operations: [] };
   }
+
   // Use marketConfig only if active
   const deliveryType = marketConfig.deliveryType || "percentage";
   const safeNumber = (val) => {
@@ -66,52 +67,44 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   };
   const deliveryPercentage = safeNumber(marketConfig.deliveryPercentage);
   const deliveryFixed = safeNumber(marketConfig.deliveryFixed);
-  const value =
-    deliveryType === "fixed" && deliveryFixed > 0
-      ? { fixedAmount: { value: deliveryFixed } }
-      : deliveryPercentage > 0
-        ? { percentage: { value: deliveryPercentage } }
-        : null;
-  if (!value) {
-    return { operations: [] };
-  }
 
-  // Update message to include currency symbol if available
-  const currencySymbol = presentmentCurrency
-    ? getCurrencySymbol(presentmentCurrency)
-    : "$";
-  function getCurrencySymbol(code) {
-    // Simple mapping for common currencies, can be expanded
-    const symbols = {
-      USD: "$",
-      EUR: "€",
-      GBP: "£",
-      CAD: "$",
-      AUD: "$",
-      JPY: "¥",
-    };
-    return symbols[code] || code;
+  // Create discount candidates for each delivery option
+  const candidates = firstDeliveryGroup.deliveryOptions
+    .map((option) => {
+      let value, message;
+      if (deliveryType === "fixed" && deliveryFixed > 0) {
+        value = { fixedAmount: { amount: deliveryFixed.toFixed(2) } };
+        message = `${deliveryFixed} ${option.cost.currencyCode} OFF DELIVERY`;
+      } else if (deliveryPercentage > 0) {
+        value = { percentage: { value: deliveryPercentage } };
+        message = `${deliveryPercentage}% OFF DELIVERY`;
+      } else {
+        return null;
+      }
+
+      return {
+        message,
+        targets: [
+          {
+            deliveryOption: {
+              handle: option.handle,
+            },
+          },
+        ],
+        value,
+      };
+    })
+    .filter(Boolean); // Remove any null entries
+
+  if (candidates.length === 0) {
+    return { operations: [] };
   }
 
   return {
     operations: [
       {
         deliveryDiscountsAdd: {
-          candidates: [
-            {
-              message: value.fixedAmount
-                ? `${value.fixedAmount.value}${currencySymbol} OFF DELIVERY`
-                : `${value.percentage.value}% OFF DELIVERY`,
-              targets: [
-                {
-                  deliveryGroup: {
-                    id: firstDeliveryGroup.id,
-                  },
-                },
-              ],
-              value,
-            },
-          ],
+          candidates,
           selectionStrategy: DeliveryDiscountSelectionStrategy.All,
         },
       },

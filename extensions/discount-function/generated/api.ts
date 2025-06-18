@@ -3064,12 +3064,12 @@ export enum WeightUnit {
   Pounds = 'POUNDS'
 }
 
-export type DeliveryInputVariables = Exact<{ [key: string]: never; }>;
+export type DeliveryDiscountInputVariables = Exact<{ [key: string]: never; }>;
 
 
-export type DeliveryInput = { __typename?: 'Input', cart: { __typename?: 'Cart', deliveryGroups: Array<{ __typename?: 'CartDeliveryGroup', id: string }> }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass> } };
+export type DeliveryDiscountInput = { __typename?: 'Input', cart: { __typename?: 'Cart', deliveryGroups: Array<{ __typename?: 'CartDeliveryGroup', id: string, deliveryOptions: Array<{ __typename?: 'CartDeliveryOption', handle: any, title?: string | null, cost: { __typename?: 'MoneyV2', amount: any, currencyCode: CurrencyCode } }> }> }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, metafield?: { __typename?: 'Metafield', value: string } | null }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, market: { __typename?: 'Market', id: string } } };
 
-export type InputVariables = Exact<{ [key: string]: never; }>;
+export type CartLineDiscountInputVariables = Exact<{ [key: string]: never; }>;
 
 
-export type Input = { __typename?: 'Input', cart: { __typename?: 'Cart', lines: Array<{ __typename?: 'CartLine', id: string, quantity: number, cost: { __typename?: 'CartLineCost', subtotalAmount: { __typename?: 'MoneyV2', amount: any }, compareAtAmountPerQuantity?: { __typename?: 'MoneyV2', amount: any } | null } }> }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, market: { __typename?: 'Market', id: string } }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, configuration?: { __typename?: 'Metafield', value: string } | null } };
+export type CartLineDiscountInput = { __typename?: 'Input', cart: { __typename?: 'Cart', lines: Array<{ __typename?: 'CartLine', id: string, quantity: number, cost: { __typename?: 'CartLineCost', subtotalAmount: { __typename?: 'MoneyV2', amount: any }, compareAtAmountPerQuantity?: { __typename?: 'MoneyV2', amount: any } | null } }> }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, market: { __typename?: 'Market', id: string } }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, configuration?: { __typename?: 'Metafield', value: string } | null } };

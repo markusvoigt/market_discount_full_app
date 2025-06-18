@@ -2,6 +2,15 @@
 
 Discountify is a powerful Shopify app that enables merchants to create and manage sophisticated market-specific discounts. Built with Shopify's App Framework and Functions, it allows for granular control over discount rules across different markets and currencies.
 
+## Demo
+
+Watch my [demo video](https://screenshot.click/18-54-ya2l2-yxx18.mp4) to see Discountify in action! The video showcases:
+
+- Creating market-specific discounts
+- Setting up shipping discounts
+- Managing discount rules
+- Real-time discount application
+
 ## Features
 
 ### Market-Specific Discounts
