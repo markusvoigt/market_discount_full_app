@@ -30,4 +30,9 @@ query CartLineDiscountInput {
       value
     }
   }
+  shop {
+    localTime {
+      date
+    }
+  }
 }

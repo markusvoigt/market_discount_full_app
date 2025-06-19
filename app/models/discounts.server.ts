@@ -5,6 +5,8 @@ import {
   UPDATE_AUTOMATIC_DISCOUNT,
   GET_DISCOUNT,
   GET_ALL_DISCOUNTS,
+  DELETE_CODE_DISCOUNT,
+  DELETE_AUTOMATIC_DISCOUNT,
 } from "../graphql/discounts";
 import { authenticate } from "../shopify.server";
 import type { DiscountClass } from "../types/admin.types";
@@ -56,6 +58,27 @@ type DiscountNode = {
     };
   };
 };
+
+interface DiscountDeleteResponse {
+  data: {
+    discountDelete: {
+      deletedCodeDiscountId?: string;
+      deletedAutomaticDiscountId?: string;
+      userErrors: Array<{
+        code: string;
+        message: string;
+        field: string[];
+      }>;
+    };
+  };
+  errors?: Array<{
+    message: string;
+    locations: Array<{
+      line: number;
+      column: number;
+    }>;
+  }>;
+}
 
 export async function createCodeDiscount(
   request: Request,
@@ -333,4 +356,26 @@ export async function getDiscounts(request: Request) {
 
     return isActive && hasNotExpired && hasStarted;
   });
+}
+
+export async function deleteDiscount(request: Request, id: string, isCodeDiscount: boolean) {
+  const { admin } = await authenticate.admin(request);
+  const mutation = isCodeDiscount ? DELETE_CODE_DISCOUNT : DELETE_AUTOMATIC_DISCOUNT;
+
+  const response = await admin.graphql(mutation, {
+    variables: { id },
+  });
+
+  const data = (await response.json()) as DiscountDeleteResponse;
+  
+  if (data.errors?.length || data.data?.discountDelete?.userErrors?.length) {
+    const errors = data.errors || data.data.discountDelete.userErrors;
+    throw new Error(errors.map((error) => error.message).join(", "));
+  }
+
+  return {
+    deletedId: isCodeDiscount 
+      ? data.data.discountDelete.deletedCodeDiscountId 
+      : data.data.discountDelete.deletedAutomaticDiscountId
+  };
 }

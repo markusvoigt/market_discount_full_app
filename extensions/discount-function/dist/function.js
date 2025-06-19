@@ -13,6 +13,33 @@ function run_default(userfunction) {
 }
 
 // extensions/discount-function/src/cart_lines_discounts_generate_run.js
+function isValidDateRange(marketConfig, shop) {
+  const now = new Date(shop.localTime.date);
+  const startDate = marketConfig.startDate ? new Date(marketConfig.startDate) : null;
+  const endDate = marketConfig.endDate ? new Date(marketConfig.endDate) : null;
+  console.log("Date validation:", {
+    now: now.toISOString(),
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString()
+  });
+  if (!startDate && !endDate) {
+    console.log("No dates set - valid");
+    return true;
+  }
+  if (startDate && !endDate) {
+    const isValid2 = startDate <= now;
+    console.log("Only start date set - valid:", isValid2);
+    return isValid2;
+  }
+  if (!startDate && endDate) {
+    const isValid2 = endDate >= now;
+    console.log("Only end date set - valid:", isValid2);
+    return isValid2;
+  }
+  const isValid = startDate <= now && endDate >= now;
+  console.log("Both dates set - valid:", isValid);
+  return isValid;
+}
 function cartLinesDiscountsGenerateRun(input) {
   if (!input.cart.lines.length) {
     throw new Error("No cart lines found");
@@ -60,6 +87,10 @@ function cartLinesDiscountsGenerateRun(input) {
   console.log("Selected market config:", marketConfig);
   if (!marketConfig) {
     console.log("No matching market configuration found");
+    return { operations: [] };
+  }
+  if (!isValidDateRange(marketConfig, input.shop)) {
+    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
   const cartLineType = marketConfig.cartLineType || "percentage";
@@ -152,6 +183,33 @@ function cartLinesDiscountsGenerateRun(input) {
 }
 
 // extensions/discount-function/src/cart_delivery_options_discounts_generate_run.js
+function isValidDateRange2(marketConfig, shop) {
+  const now = new Date(shop.localTime.date);
+  const startDate = marketConfig.startDate ? new Date(marketConfig.startDate) : null;
+  const endDate = marketConfig.endDate ? new Date(marketConfig.endDate) : null;
+  console.log("Date validation:", {
+    now: now.toISOString(),
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString()
+  });
+  if (!startDate && !endDate) {
+    console.log("No dates set - valid");
+    return true;
+  }
+  if (startDate && !endDate) {
+    const isValid2 = startDate <= now;
+    console.log("Only start date set - valid:", isValid2);
+    return isValid2;
+  }
+  if (!startDate && endDate) {
+    const isValid2 = endDate >= now;
+    console.log("Only end date set - valid:", isValid2);
+    return isValid2;
+  }
+  const isValid = startDate <= now && endDate >= now;
+  console.log("Both dates set - valid:", isValid);
+  return isValid;
+}
 function cartDeliveryOptionsDiscountsGenerateRun(input) {
   const firstDeliveryGroup = input.cart.deliveryGroups[0];
   if (!firstDeliveryGroup) {
@@ -188,6 +246,10 @@ function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
   if (!marketConfig) {
     console.log("No matching market configuration found");
+    return { operations: [] };
+  }
+  if (!isValidDateRange2(marketConfig, input.shop)) {
+    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
   const deliveryType = marketConfig.deliveryType || "percentage";

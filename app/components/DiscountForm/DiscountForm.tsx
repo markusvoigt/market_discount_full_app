@@ -394,11 +394,6 @@ export function DiscountForm({
                         checked={formState.combinesWith.orderDiscounts}
                         onChange={(checked) => setCombinesWith("orderDiscounts", checked)}
                       />
-                      <Checkbox
-                        label="Other shipping discounts"
-                        checked={formState.combinesWith.shippingDiscounts}
-                        onChange={(checked) => setCombinesWith("shippingDiscounts", checked)}
-                      />
                     </>
                   )}
                 </BlockStack>

@@ -170,3 +170,29 @@ export const CREATE_AUTOMATIC_DISCOUNT = `
     }
   }
 `;
+
+export const DELETE_CODE_DISCOUNT = `
+  mutation DeleteCodeDiscount($id: ID!) {
+    discountDelete: discountCodeDelete(id: $id) {
+      deletedCodeDiscountId
+      userErrors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;
+
+export const DELETE_AUTOMATIC_DISCOUNT = `
+  mutation DeleteAutomaticDiscount($id: ID!) {
+    discountDelete: discountAutomaticDelete(id: $id) {
+      deletedAutomaticDiscountId
+      userErrors {
+        code
+        message
+        field
+      }
+    }
+  }
+`;

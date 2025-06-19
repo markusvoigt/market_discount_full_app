@@ -1,5 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useSubmit } from "@remix-run/react";
 import {
   Page,
   Button,
@@ -12,10 +13,11 @@ import {
   DataTable,
   Badge,
   Banner,
+  ButtonGroup,
 } from "@shopify/polaris";
 
 import { getFunctions } from "../models/functions.server";
-import { getDiscounts } from "../models/discounts.server";
+import { getDiscounts, deleteDiscount } from "../models/discounts.server";
 
 type DiscountNode = {
   id: string;
@@ -33,6 +35,20 @@ type DiscountNode = {
   };
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const formData = await request.formData();
+  const id = formData.get("id") as string;
+  const isCodeDiscount = formData.get("isCodeDiscount") === "true";
+
+  try {
+    await deleteDiscount(request, id, isCodeDiscount);
+    return json({ success: true });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return json({ success: false, error: errorMessage });
+  }
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [functions, discounts] = await Promise.all([
     getFunctions(request),
@@ -43,6 +59,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Index() {
   const { functions, discounts } = useLoaderData<typeof loader>();
+  const submit = useSubmit();
+
+  const handleDelete = (id: string, isCodeDiscount: boolean) => {
+    if (window.confirm("Are you sure you want to delete this discount?")) {
+      const formData = new FormData();
+      formData.append("id", id);
+      formData.append("isCodeDiscount", isCodeDiscount.toString());
+      submit(formData, { method: "post" });
+    }
+  };
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -73,12 +99,23 @@ export default function Index() {
     getStatusBadge(discount.discount.status),
     formatDate(discount.discount.startsAt),
     discount.discount.endsAt ? formatDate(discount.discount.endsAt) : 'No end date',
-    <Button
-      variant="primary"
-      url={`/app/discount/${functions[0]?.id}/${discount.id.split('/').pop()}`}
-    >
-      Edit
-    </Button>,
+    <ButtonGroup>
+      <Button
+        variant="primary"
+        url={`/app/discount/${functions[0]?.id}/${discount.id.split('/').pop()}`}
+      >
+        Edit
+      </Button>
+      <Button
+        tone="critical"
+        onClick={() => handleDelete(
+          discount.id,
+          discount.discount.__typename === 'DiscountCodeApp'
+        )}
+      >
+        Delete
+      </Button>
+    </ButtonGroup>,
   ]);
 
   return (

@@ -5,6 +5,53 @@ import {
 } from "../generated/api";
 
 /**
+ * Helper function to validate if a market configuration's date range is valid
+ * @param {Object} marketConfig The market configuration object
+ * @param {Object} shop The shop object from the input
+ * @returns {boolean} Whether the date range is valid
+ */
+function isValidDateRange(marketConfig, shop) {
+  // Get today's date at start of day in shop's timezone
+  const now = new Date(shop.localTime.date);
+  const startDate = marketConfig.startDate
+    ? new Date(marketConfig.startDate)
+    : null;
+  const endDate = marketConfig.endDate ? new Date(marketConfig.endDate) : null;
+
+  console.log("Date validation:", {
+    now: now.toISOString(),
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString(),
+  });
+
+  // If no dates are set, consider it valid
+  if (!startDate && !endDate) {
+    console.log("No dates set - valid");
+    return true;
+  }
+
+  // If only start date is set, check if it's not in the future
+  if (startDate && !endDate) {
+    // If there's no end date, the discount is valid as long as the start date has passed
+    const isValid = startDate <= now;
+    console.log("Only start date set - valid:", isValid);
+    return isValid;
+  }
+
+  // If only end date is set, check if it's not in the past
+  if (!startDate && endDate) {
+    const isValid = endDate >= now;
+    console.log("Only end date set - valid:", isValid);
+    return isValid;
+  }
+
+  // Both dates are set, check if current date is within range
+  const isValid = startDate <= now && endDate >= now;
+  console.log("Both dates set - valid:", isValid);
+  return isValid;
+}
+
+/**
  * @typedef {import("../generated/api").CartLineDiscountInput} RunInput
  * @typedef {import("../generated/api").CartLinesDiscountsGenerateRunResult} CartLinesDiscountsGenerateRunResult
  */
@@ -13,7 +60,6 @@ import {
  * @param {RunInput} input
  * @returns {CartLinesDiscountsGenerateRunResult}
  */
-
 export function cartLinesDiscountsGenerateRun(input) {
   if (!input.cart.lines.length) {
     throw new Error("No cart lines found");
@@ -79,6 +125,12 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   if (!marketConfig) {
     console.log("No matching market configuration found");
+    return { operations: [] };
+  }
+
+  // Check if the market configuration's date range is valid
+  if (!isValidDateRange(marketConfig, input.shop)) {
+    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
 
