@@ -9,3 +9,14 @@ export enum RequirementType {
   Subtotal = "SUBTOTAL",
   Quantity = "QUANTITY",
 }
+
+export interface Customer {
+  id: string;
+  displayName: string;
+  email: string;
+}
+
+export interface CustomerSegment {
+  id: string;
+  name: string;
+}

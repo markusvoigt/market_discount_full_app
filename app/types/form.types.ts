@@ -1,5 +1,13 @@
 import { DiscountClass } from "./admin.types.d";
-import { DiscountMethod } from "./types";
+import { Customer, CustomerSegment, DiscountMethod } from "./types";
+import { Eligibility } from "../constants";
+
+export { Eligibility };
+
+export type Field<T> = {
+  value: T;
+  onChange: (value: T) => void;
+};
 
 export type DiscountType = "products_order" | "shipping";
 
@@ -17,15 +25,15 @@ export interface MarketConfig {
   endDate?: string | null;
   excludeOnSale?: boolean;
   active: boolean;
-  cartLineType: 'percentage' | 'fixed';
-  cartLinePercentage: string;
-  cartLineFixed: string;
-  orderType: 'percentage' | 'fixed';
-  orderPercentage: string;
-  orderFixed: string;
-  deliveryType: 'percentage' | 'fixed';
-  deliveryPercentage: string;
-  deliveryFixed: string;
+  cartLineType?: 'percentage' | 'fixed';
+  cartLinePercentage?: string;
+  cartLineFixed?: string;
+  orderType?: 'percentage' | 'fixed';
+  orderPercentage?: string;
+  orderFixed?: string;
+  deliveryType?: 'percentage' | 'fixed';
+  deliveryPercentage?: string;
+  deliveryFixed?: string;
 }
 
 interface DiscountConfiguration {
@@ -34,7 +42,7 @@ interface DiscountConfiguration {
   markets?: MarketConfig[];
 }
 
-export interface FormState {
+export interface DiscountFormState {
   title: string;
   method: DiscountMethod;
   code: string;
@@ -46,4 +54,7 @@ export interface FormState {
   startDate: string | Date;
   endDate: string | Date | null;
   configuration: DiscountConfiguration;
+  eligibility: Eligibility;
+  selectedCustomers: Customer[];
+  selectedCustomerSegments: CustomerSegment[];
 }

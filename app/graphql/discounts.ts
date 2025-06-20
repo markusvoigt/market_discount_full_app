@@ -48,12 +48,15 @@ export const GET_DISCOUNT = `
   query GetDiscount($id: ID!) {
     discountNode(id: $id) {
       id
-      configurationField: metafield(
-        namespace: "$app:example-discounts--ui-extension"
-        key: "function-configuration"
-      ) {
-        id
-        value
+      metafields(first: 10) {
+        edges {
+          node {
+            id
+            namespace
+            key
+            value
+          }
+        }
       }
       discount {
         __typename
@@ -70,19 +73,39 @@ export const GET_DISCOUNT = `
         }
         ... on DiscountCodeApp {
           title
+          status
+          startsAt
+          endsAt
+          usageLimit
+          appliesOncePerCustomer
           discountClasses
           combinesWith {
             orderDiscounts
             productDiscounts
             shippingDiscounts
           }
-          startsAt
-          endsAt
-          usageLimit
-          appliesOncePerCustomer
           codes(first: 1) {
             nodes {
               code
+            }
+          }
+          customerSelection {
+            __typename
+            ... on DiscountCustomerAll {
+              __typename
+            }
+            ... on DiscountCustomers {
+              customers {
+                id
+                displayName
+                email
+              }
+            }
+            ... on DiscountCustomerSegments {
+              segments {
+                id
+                name
+              }
             }
           }
         }

@@ -59,19 +59,19 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const message = triggeringDiscountCode || configuration.title;
+  const message = triggeringDiscountCode || configuration.title || "Discount";
 
   let discountValue;
   if (marketConfig.cartLineType === "percentage") {
     discountValue = {
       percentage: {
-        value: marketConfig.cartLinePercentage,
+        value: parseFloat(marketConfig.cartLinePercentage),
       },
     };
   } else {
     discountValue = {
       fixedAmount: {
-        amount: marketConfig.cartLineFixed,
+        amount: parseFloat(marketConfig.cartLineFixed),
         appliesToEachItem: true,
       },
     };

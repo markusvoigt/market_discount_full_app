@@ -1,118 +1,90 @@
 import { useSubmit } from "@remix-run/react";
 import { useCallback, useState } from "react";
+import {
+  Customer,
+  CustomerSegment,
+  DiscountMethod,
+} from "../types/types";
+import {
+  type DiscountFormState,
+  type MarketConfig,
+  Eligibility,
+} from "../types/form.types";
 
-import { DiscountClass } from "../types/admin.types.d";
-import { DiscountMethod } from "../types/types";
-import { MarketConfig, DiscountType } from "../types/form.types";
-
-interface Collection {
-  id: string;
-  title: string;
-}
-
-interface CombinesWith {
-  orderDiscounts: boolean;
-  productDiscounts: boolean;
-  shippingDiscounts: boolean;
-}
-
-interface DiscountConfiguration {
-  metafieldId?: string;
-  collectionIds?: string[];
-  markets?: MarketConfig[];
-}
-
-interface FormState {
-  title: string;
-  method: DiscountMethod;
-  code: string;
-  combinesWith: CombinesWith;
-  discountClasses: DiscountClass[];
-  discountType: DiscountType;
-  usageLimit: string;
-  appliesOncePerCustomer: boolean;
-  startDate: string | Date;
-  endDate: string | Date | null;
-  configuration: {
-    metafieldId?: string;
-    collectionIds?: string[];
-    markets?: MarketConfig[];
+interface UseDiscountFormProps {
+  initialData?: Partial<DiscountFormState> & {
+    customerSelection?: {
+      all: boolean;
+      customers: Customer[];
+      customerSegments: CustomerSegment[];
+    };
   };
 }
 
-interface UseDiscountFormProps {
-  initialData?: Partial<FormState>;
-}
-
-const defaultFormState: FormState = {
+const defaultFormState: DiscountFormState = {
   title: "",
-  method: DiscountMethod.Code,
+  method: DiscountMethod.Automatic,
   code: "",
   combinesWith: {
     orderDiscounts: false,
     productDiscounts: false,
     shippingDiscounts: false,
   },
-  discountClasses: [],
-  discountType: "products_order",
   usageLimit: "",
   appliesOncePerCustomer: false,
   startDate: new Date(),
   endDate: null,
   configuration: {
+    collectionIds: [],
     markets: [],
   },
+  discountClasses: [],
+  discountType: "products_order",
+  eligibility: Eligibility.Everyone,
+  selectedCustomers: [],
+  selectedCustomerSegments: [],
 };
 
-export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
-  const submit = useSubmit();
-  const todaysDate = new Date();
+export function useDiscountForm({
+  initialData = defaultFormState,
+}: UseDiscountFormProps) {
+  const [formState, setFormState] = useState<DiscountFormState>(() => {
+    const state = { ...defaultFormState, ...initialData };
 
-  const [formState, setFormState] = useState<FormState>(() => {
-    const discountType = initialData?.discountType ?? defaultFormState.discountType;
-    const discountClasses = discountType === "shipping"
-      ? [DiscountClass.Shipping]
-      : [DiscountClass.Product, DiscountClass.Order];
-
-    return {
-      ...defaultFormState,
-      ...initialData,
-      // Ensure type safety for nullable fields
-      usageLimit: initialData?.usageLimit?.toString() ?? defaultFormState.usageLimit,
-      startDate: initialData?.startDate ?? defaultFormState.startDate,
-      endDate: initialData?.endDate ?? defaultFormState.endDate,
-      discountClasses,
-      configuration: {
-        metafieldId: initialData?.configuration?.metafieldId,
-        markets: initialData?.configuration?.markets ?? defaultFormState.configuration.markets,
-      },
-    };
+    if (initialData.customerSelection) {
+      if (initialData.customerSelection.all) {
+        state.eligibility = Eligibility.Everyone;
+      } else if (
+        initialData.customerSelection.customers &&
+        initialData.customerSelection.customers.length > 0
+      ) {
+        state.eligibility = Eligibility.Customers;
+        state.selectedCustomers = initialData.customerSelection.customers;
+      } else if (
+        initialData.customerSelection.customerSegments &&
+        initialData.customerSelection.customerSegments.length > 0
+      ) {
+        state.eligibility = Eligibility.CustomerSegments;
+        state.selectedCustomerSegments =
+          initialData.customerSelection.customerSegments;
+      }
+    }
+    return state as DiscountFormState;
   });
+  const remixSubmit = useSubmit();
 
   const setField = useCallback(
-    <K extends keyof FormState>(field: K, value: FormState[K]) => {
-      setFormState((prev) => {
-        const updates = { [field]: value } as Pick<FormState, K>;
-        
-        // If changing discount type, update discount classes
-        if (field === "discountType") {
-          const type = value as DiscountType;
-          (updates as any).discountClasses = type === "shipping" 
-            ? [DiscountClass.Shipping]
-            : [DiscountClass.Product, DiscountClass.Order];
-        }
-        
-        return { ...prev, ...updates };
-      });
+    <T extends keyof DiscountFormState>(
+      field: T,
+      value: DiscountFormState[T],
+    ) => {
+      setFormState((prev) => ({ ...prev, [field]: value }));
     },
     [],
   );
 
   const setConfigField = useCallback(
-    (
-      field: keyof DiscountConfiguration,
-      value: string | string[] | Collection[],
-    ) => {
+    (field: keyof DiscountFormState["configuration"], value: any) => {
       setFormState((prev) => ({
         ...prev,
         configuration: { ...prev.configuration, [field]: value },
@@ -128,7 +100,7 @@ export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
         configuration: {
           ...prev.configuration,
           markets: (prev.configuration.markets || []).map((m) =>
-            m.marketId === marketId ? { ...m, [field]: value } : m
+            m.marketId === marketId ? { ...m, [field]: value } : m,
           ),
         },
       }));
@@ -137,7 +109,7 @@ export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
   );
 
   const setCombinesWith = useCallback(
-    (field: keyof CombinesWith, value: boolean) => {
+    (field: keyof DiscountFormState["combinesWith"], value: boolean) => {
       setFormState((prev) => ({
         ...prev,
         combinesWith: { ...prev.combinesWith, [field]: value },
@@ -146,39 +118,11 @@ export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
     [],
   );
 
-  const handleSubmit = useCallback(() => {
-    const formData = new FormData();
-    const now = new Date().toISOString().slice(0, 10);
-    formData.append(
-      "discount",
-      JSON.stringify({
-        title: formState.title,
-        method: formState.method,
-        code: formState.code,
-        combinesWith: formState.combinesWith,
-        discountClasses: formState.discountClasses,
-        usageLimit:
-          formState.usageLimit === ""
-            ? null
-            : parseInt(formState.usageLimit, 10),
-        appliesOncePerCustomer: formState.appliesOncePerCustomer,
-        startsAt: formState.startDate,
-        endsAt: formState.endDate,
-        configuration: {
-          ...(formState.configuration.metafieldId
-            ? { metafieldId: formState.configuration.metafieldId }
-            : {}),
-          collectionIds: formState.configuration.collectionIds,
-          markets: (formState.configuration.markets || []).map((market) => ({
-            ...market,
-            startDate: market.startDate || now,
-            endDate: market.endDate || null,
-          })),
-        },
-      }),
+  const submit = useCallback(() => {
+    document.getElementById("discount-form")?.dispatchEvent(
+      new Event("submit", { cancelable: true, bubbles: true }),
     );
-    submit(formData, { method: "post" });
-  }, [formState, submit]);
+  }, []);
 
   return {
     formState,
@@ -186,6 +130,6 @@ export function useDiscountForm({ initialData }: UseDiscountFormProps = {}) {
     setConfigField,
     setMarketConfigField,
     setCombinesWith,
-    submit: handleSubmit,
+    submit,
   };
 }

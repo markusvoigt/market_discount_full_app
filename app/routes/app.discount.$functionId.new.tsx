@@ -33,8 +33,11 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     startsAt,
     endsAt,
     discountClasses,
+    customerSelection,
     configuration,
   } = JSON.parse(discountData);
+
+  const parsedUsageLimit = usageLimit ? parseInt(String(usageLimit), 10) : null;
 
   const baseDiscount = {
     functionId,
@@ -52,8 +55,9 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
       request,
       baseDiscount,
       code,
-      usageLimit,
+      parsedUsageLimit,
       appliesOncePerCustomer,
+      customerSelection,
       {
         metafieldId: configuration.metafieldId,
         markets: configuration.markets || [],

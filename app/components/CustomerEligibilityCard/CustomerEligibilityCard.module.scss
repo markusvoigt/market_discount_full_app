@@ -1,0 +1,13 @@
+.SelectedItemsActivator > button {
+  width: 100%;
+}
+
+.CustomerItem {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.Email {
+  color: var(--p-color-text-subdued);
+} 
