@@ -26,6 +26,12 @@ interface BaseDiscount {
   endsAt: Date | null;
 }
 
+interface CustomerSelection {
+  all: boolean;
+  customers: string[];
+  customerSegments: string[];
+}
+
 interface DiscountConfiguration {
   metafieldId?: string;
   markets?: MarketConfig[];
@@ -56,6 +62,7 @@ type DiscountNode = {
         code: string;
       }>;
     };
+    customerSelection: CustomerSelection;
   };
 };
 
@@ -86,45 +93,72 @@ export async function createCodeDiscount(
   code: string,
   usageLimit: number | null,
   appliesOncePerCustomer: boolean,
+  customerSelection: CustomerSelection,
   configuration: DiscountConfiguration,
 ) {
   const { admin } = await authenticate.admin(request);
+
+  if (
+    !customerSelection.all &&
+    (!customerSelection.customers ||
+      customerSelection.customers.length === 0) &&
+    (!customerSelection.customerSegments ||
+      customerSelection.customerSegments.length === 0)
+  ) {
+    return {
+      errors: [
+        {
+          field: ["customerSelection"],
+          message: "Please select at least one customer or customer segment.",
+        },
+      ],
+    };
+  }
+
+  const discount = {
+    ...baseDiscount,
+    title: code,
+    code,
+    usageLimit,
+    appliesOncePerCustomer,
+    customerSelection: customerSelection.all
+      ? { all: true }
+      : {
+          customers: { add: customerSelection.customers },
+          customerSegments: { add: customerSelection.customerSegments },
+        },
+    metafields: [
+      {
+        namespace: "$app:example-discounts--ui-extension",
+        key: "function-configuration",
+        type: "json",
+        value: JSON.stringify({
+          markets: (configuration.markets || []).map(market => ({
+            marketId: market.marketId,
+            marketName: market.marketName,
+            currencyCode: market.currencyCode,
+            startDate: market.startDate,
+            endDate: market.endDate,
+            excludeOnSale: market.excludeOnSale,
+            active: market.active,
+            cartLineType: market.cartLineType,
+            cartLinePercentage: market.cartLinePercentage,
+            cartLineFixed: market.cartLineFixed,
+            orderType: market.orderType,
+            orderPercentage: market.orderPercentage,
+            orderFixed: market.orderFixed,
+            deliveryType: market.deliveryType,
+            deliveryPercentage: market.deliveryPercentage,
+            deliveryFixed: market.deliveryFixed
+          })),
+        }),
+      },
+    ],
+  };
+
   const response = await admin.graphql(CREATE_CODE_DISCOUNT, {
     variables: {
-      discount: {
-        ...baseDiscount,
-        title: code,
-        code,
-        usageLimit,
-        appliesOncePerCustomer,
-        metafields: [
-          {
-            namespace: "$app:example-discounts--ui-extension",
-            key: "function-configuration",
-            type: "json",
-            value: JSON.stringify({
-              markets: (configuration.markets || []).map(market => ({
-                marketId: market.marketId,
-                marketName: market.marketName,
-                currencyCode: market.currencyCode,
-                startDate: market.startDate,
-                endDate: market.endDate,
-                excludeOnSale: market.excludeOnSale,
-                active: market.active,
-                cartLineType: market.cartLineType,
-                cartLinePercentage: market.cartLinePercentage,
-                cartLineFixed: market.cartLineFixed,
-                orderType: market.orderType,
-                orderPercentage: market.orderPercentage,
-                orderFixed: market.orderFixed,
-                deliveryType: market.deliveryType,
-                deliveryPercentage: market.deliveryPercentage,
-                deliveryFixed: market.deliveryFixed
-              })),
-            }),
-          },
-        ],
-      },
+      discount,
     },
   });
 
@@ -174,6 +208,7 @@ export async function updateCodeDiscount(
   code: string,
   usageLimit: number | null,
   appliesOncePerCustomer: boolean,
+  customerSelection: CustomerSelection,
   configuration: {
     metafieldId: string;
     collectionIds?: string[];
@@ -181,45 +216,71 @@ export async function updateCodeDiscount(
   },
 ) {
   const { admin } = await authenticate.admin(request);
+
+  if (
+    !customerSelection.all &&
+    (!customerSelection.customers ||
+      customerSelection.customers.length === 0) &&
+    (!customerSelection.customerSegments ||
+      customerSelection.customerSegments.length === 0)
+  ) {
+    return {
+      errors: [
+        {
+          field: ["customerSelection"],
+          message: "Please select at least one customer or customer segment.",
+        },
+      ],
+    };
+  }
+
   const discountId = id.includes("gid://")
     ? id
     : `gid://shopify/DiscountCodeNode/${id}`;
 
+  const discount = {
+    ...baseDiscount,
+    title: code,
+    code,
+    usageLimit,
+    appliesOncePerCustomer,
+    customerSelection: customerSelection.all
+      ? { all: true }
+      : {
+          customers: { add: customerSelection.customers },
+          customerSegments: { add: customerSelection.customerSegments },
+        },
+    metafields: [
+      {
+        id: configuration.metafieldId,
+        value: JSON.stringify({
+          markets: (configuration.markets || []).map(market => ({
+            marketId: market.marketId,
+            marketName: market.marketName,
+            currencyCode: market.currencyCode,
+            startDate: market.startDate,
+            endDate: market.endDate,
+            excludeOnSale: market.excludeOnSale,
+            active: market.active,
+            cartLineType: market.cartLineType,
+            cartLinePercentage: market.cartLinePercentage,
+            cartLineFixed: market.cartLineFixed,
+            orderType: market.orderType,
+            orderPercentage: market.orderPercentage,
+            orderFixed: market.orderFixed,
+            deliveryType: market.deliveryType,
+            deliveryPercentage: market.deliveryPercentage,
+            deliveryFixed: market.deliveryFixed
+          })),
+        }),
+      },
+    ],
+  };
+
   const response = await admin.graphql(UPDATE_CODE_DISCOUNT, {
     variables: {
       id: discountId,
-      discount: {
-        ...baseDiscount,
-        title: code,
-        code,
-        usageLimit,
-        appliesOncePerCustomer,
-        metafields: [
-          {
-            id: configuration.metafieldId,
-            value: JSON.stringify({
-              markets: (configuration.markets || []).map(market => ({
-                marketId: market.marketId,
-                marketName: market.marketName,
-                currencyCode: market.currencyCode,
-                startDate: market.startDate,
-                endDate: market.endDate,
-                excludeOnSale: market.excludeOnSale,
-                active: market.active,
-                cartLineType: market.cartLineType,
-                cartLinePercentage: market.cartLinePercentage,
-                cartLineFixed: market.cartLineFixed,
-                orderType: market.orderType,
-                orderPercentage: market.orderPercentage,
-                orderFixed: market.orderFixed,
-                deliveryType: market.deliveryType,
-                deliveryPercentage: market.deliveryPercentage,
-                deliveryFixed: market.deliveryFixed
-              })),
-            }),
-          },
-        ],
-      },
+      discount,
     },
   });
 
@@ -301,28 +362,19 @@ export async function getDiscount(request: Request, id: string) {
     return { discount: null };
   }
 
-  const method =
-    responseJson.data.discountNode.discount.__typename === "DiscountCodeApp"
-      ? DiscountMethod.Code
-      : DiscountMethod.Automatic;
+  const { discount, metafields } = responseJson.data.discountNode;
 
-  const {
-    title,
-    codes,
-    combinesWith,
-    usageLimit,
-    appliesOncePerCustomer,
-    startsAt,
-    endsAt,
-    discountClasses,
-  } = responseJson.data.discountNode.discount;
-  const configurationRaw = JSON.parse(
-    responseJson.data.discountNode.configurationField.value,
-  );
+  // Find the configuration metafield
+  const configurationMetafield = metafields.edges.find(
+    (edge: any) => edge.node.key === "function-configuration",
+  )?.node;
+
+  // Parse configuration from metafield
+  const configurationRaw = JSON.parse(configurationMetafield?.value || "{}");
   const now = new Date().toISOString().slice(0, 10);
   const configuration = {
     collectionIds: configurationRaw.collectionIds ?? [],
-    metafieldId: responseJson.data.discountNode.configurationField.id,
+    metafieldId: configurationMetafield?.id,
     markets: (configurationRaw.markets || []).map((market: any) => ({
       ...market,
       startDate: market.startDate || now,
@@ -330,20 +382,48 @@ export async function getDiscount(request: Request, id: string) {
     })),
   };
 
-  return {
-    discount: {
-      title,
-      method,
-      code: codes?.nodes[0]?.code ?? "",
-      combinesWith,
-      discountClasses,
-      usageLimit: usageLimit ?? null,
-      appliesOncePerCustomer: appliesOncePerCustomer ?? false,
-      startsAt,
-      endsAt,
-      configuration,
-    },
+  // Parse customer selection
+  const customerSelection = {
+    all: discount.__typename === "DiscountAutomaticApp",
+    customers: [],
+    customerSegments: [],
   };
+
+  if (discount.customerSelection) {
+    switch (discount.customerSelection.__typename) {
+      case "DiscountCustomerAll":
+        customerSelection.all = true;
+        break;
+      case "DiscountCustomers":
+        customerSelection.customers = discount.customerSelection.customers;
+        break;
+      case "DiscountCustomerSegments":
+        customerSelection.customerSegments =
+          discount.customerSelection.segments;
+        break;
+    }
+  }
+
+  // Combine all data into a single discount object for the form
+  const formDiscount = {
+    id,
+    title: discount.title,
+    method:
+      discount.__typename === "DiscountCodeApp"
+        ? DiscountMethod.Code
+        : DiscountMethod.Automatic,
+    code: discount.codes?.nodes[0]?.code || "",
+    combinesWith: discount.combinesWith,
+    usageLimit: discount.usageLimit ?? null,
+    appliesOncePerCustomer: discount.appliesOncePerCustomer ?? false,
+    startsAt: discount.startsAt,
+    endsAt: discount.endsAt,
+    discountClasses: discount.discountClasses,
+    configuration,
+    customerSelection,
+  };
+
+  return { discount: formDiscount };
 }
 
 export async function getDiscounts(request: Request) {
@@ -351,19 +431,13 @@ export async function getDiscounts(request: Request) {
   const response = await admin.graphql(GET_ALL_DISCOUNTS);
   const json = await response.json();
   
-  // Filter out discounts that:
-  // 1. Have no metafield configuration (not created by our app)
-  // 2. Are not active or scheduled
-  // 3. Have expired
   return json.data.discountNodes.nodes.filter((node: DiscountNode) => {
-    // Must have valid metafield configuration
     if (!node.metafield?.value) return false;
 
     const now = new Date();
     const startDate = new Date(node.discount.startsAt);
     const endDate = node.discount.endsAt ? new Date(node.discount.endsAt) : null;
 
-    // Check if discount is active or scheduled and not expired
     const isActive = node.discount.status === 'ACTIVE' || node.discount.status === 'SCHEDULED';
     const hasNotExpired = !endDate || endDate > now;
     const hasStarted = startDate <= now;

@@ -12,18 +12,29 @@ import {
   Select,
   InlineStack,
   DataTable,
+  Button,
 } from "@shopify/polaris";
 import { returnToDiscounts } from "app/utils/navigation";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
 import { useDiscountForm } from "../../hooks/useDiscountForm";
 import { DiscountClass } from "../../types/admin.types.d";
-import { DiscountMethod } from "../../types/types";
+import {
+  Customer,
+  CustomerSegment,
+  DiscountMethod,
+} from "../../types/types";
 import { CollectionPicker } from "../CollectionPicker/CollectionPicker";
 import { DatePickerField } from "../DatePickerField/DatePickerField";
-import { MarketConfig, DiscountType } from "../../types/form.types";
+import {
+  MarketConfig,
+  DiscountType,
+} from "../../types/form.types";
+import { Eligibility } from "../../constants";
 import { GET_MARKETS } from "../../graphql/discounts";
 import { UsageLimitsCard } from "../UsageLimitsCard";
+import { CustomerEligibilityCard } from "../CustomerEligibilityCard/CustomerEligibilityCard";
+import { CustomerSearchModal } from "../CustomerSearchModal";
 
 interface SubmitError {
   message: string;
@@ -49,6 +60,11 @@ interface DiscountFormProps {
       metafieldId?: string;
       collectionIds?: string[];
       markets?: MarketConfig[];
+    };
+    customerSelection?: {
+      all: boolean;
+      customers: Customer[];
+      customerSegments: CustomerSegment[];
     };
   };
   collections: { id: string; title: string }[];
@@ -91,6 +107,9 @@ export function DiscountForm({
 
   const [collections, setCollections] =
     useState<DiscountFormProps["collections"]>(initialCollections);
+
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchResourceType, setSearchResourceType] = useState<"customer" | "customer_segment">("customer");
 
   const today = useMemo(() => {
     const date = new Date();
@@ -265,368 +284,430 @@ export function DiscountForm({
     return symbols[code] || code;
   };
 
+  const handleSearchModalSelect = (selection: any[]) => {
+    if (searchResourceType === "customer") {
+      setField("selectedCustomers", selection);
+    } else {
+      setField("selectedCustomerSegments", selection);
+    }
+  };
+
   return (
-    <Layout>
-      {errorBanner}
-      {successBanner}
-      <Layout.Section>
-        <Form method="post" id="discount-form">
-          <input
-            type="hidden"
-            name="discount"
-            value={JSON.stringify({
-              title: formState.title,
-              method: formState.method,
-              code: formState.code,
-              combinesWith: formState.combinesWith,
-              discountClasses: deriveDiscountClassesFromMarkets(formState.configuration.markets, formState.discountType),
-              usageLimit:
-                formState.usageLimit === ""
-                  ? null
-                  : parseInt(formState.usageLimit, 10),
-              appliesOncePerCustomer: formState.appliesOncePerCustomer,
-              startsAt: formState.startDate,
-              endsAt: formState.endDate,
-              configuration: {
-                ...(formState.configuration.metafieldId
-                  ? { metafieldId: formState.configuration.metafieldId }
-                  : {}),
-                collectionIds: formState.configuration.collectionIds || [],
-                markets: formState.configuration.markets || [],
-              },
-            })}
-          />
-          <BlockStack gap="400">
-            {/* Method section */}
-            <Card>
-              <Box>
-                <BlockStack gap="100">
-                  <Text variant="headingMd" as="h2">
-                    {isEditing ? "Edit discount" : "Create discount"}
-                  </Text>
-
-                  <Select
-                    label="Discount type"
-                    options={methodOptions}
-                    value={formState.method}
-                    onChange={(value: DiscountMethod) =>
-                      setField("method", value)
-                    }
-                    disabled={isEditing}
-                  />
-
-                  {formState.method === DiscountMethod.Automatic ? (
-                    <TextField
-                      label="Discount title"
-                      autoComplete="off"
-                      value={formState.title}
-                      onChange={(value) => setField("title", value)}
-                    />
-                  ) : (
-                    <TextField
-                      label="Discount code"
-                      autoComplete="off"
-                      value={formState.code}
-                      onChange={(value) => setField("code", value)}
-                      helpText="Customers will enter this discount code at checkout."
-                    />
-                  )}
-
-                  <Select
-                    label="What does this discount apply to?"
-                    options={[
-                      { label: "Products and/or Order Total", value: "products_order" },
-                      { label: "Shipping", value: "shipping" }
-                    ]}
-                    value={formState.discountType || "products_order"}
-                    onChange={(value) => {
-                      setField("discountType", value as DiscountType);
-                      // Update discount classes based on type
-                      if (value === "products_order") {
-                        setField("discountClasses", [DiscountClass.Product, DiscountClass.Order]);
-                      } else {
-                        setField("discountClasses", [DiscountClass.Shipping]);
-                      }
-                    }}
-                    helpText="Choose whether this discount reduces product prices/order total or shipping costs. This cannot be changed after creation."
-                    disabled={isEditing}
-                  />
-                </BlockStack>
-              </Box>
-            </Card>
-
-            {formState.method === DiscountMethod.Code ? (
-              <UsageLimitsCard
-                totalUsageLimit={formState.usageLimit || ""}
-                onUsageLimitChange={(value) => setField("usageLimit", value)}
-                oncePerCustomer={formState.appliesOncePerCustomer}
-                onOncePerCustomerChange={(value) =>
-                  setField("appliesOncePerCustomer", value)
-                }
-              />
-            ) : null}
-
-            {/* Discount Combinations section */}
-            <Card>
-              <Box>
-                <BlockStack gap="100">
-                  <Text variant="headingMd" as="h2">
-                    Discount Combinations
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Select which types of other discounts this discount can be combined with.
-                  </Text>
-                  {formState.discountType === "products_order" ? (
-                    <>
-                      <Checkbox
-                        label="Other product discounts"
-                        checked={formState.combinesWith.productDiscounts}
-                        onChange={(checked) => setCombinesWith("productDiscounts", checked)}
-                      />
-                      <Checkbox
-                        label="Other order discounts"
-                        checked={formState.combinesWith.orderDiscounts}
-                        onChange={(checked) => setCombinesWith("orderDiscounts", checked)}
-                      />
-                      <Checkbox
-                        label="Shipping discounts"
-                        checked={formState.combinesWith.shippingDiscounts}
-                        onChange={(checked) => setCombinesWith("shippingDiscounts", checked)}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Checkbox
-                        label="Product discounts"
-                        checked={formState.combinesWith.productDiscounts}
-                        onChange={(checked) => setCombinesWith("productDiscounts", checked)}
-                      />
-                      <Checkbox
-                        label="Order discounts"
-                        checked={formState.combinesWith.orderDiscounts}
-                        onChange={(checked) => setCombinesWith("orderDiscounts", checked)}
-                      />
-                    </>
-                  )}
-                </BlockStack>
-              </Box>
-            </Card>
-
-            {/* Market Configuration section */}
-            <Card>
-              <Box>
-                <BlockStack gap="100">
-                  <Text variant="headingMd" as="h2">
-                    Market-specific configuration
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Configure discount values per market. All values are in the presentment currency for each market.
-                  </Text>
-                  {(formState.configuration.markets || []).length > 0 && (
-                    <DataTable
-                      columnContentTypes={[
-                        'text', 'text', 'text', 'text', 'text',
-                        ...(formState.discountType === "products_order" ? ['text' as const, 'text' as const] : []),
-                        ...(formState.discountType === "shipping" ? ['text' as const] : [])
-                      ]}
-                      headings={[
-                        "Market",
-                        "Active",
-                        "Start",
-                        "End",
-                        "Exclude On Sale",
-                        ...(formState.discountType === "products_order" ? ["Product Discount", "Order Discount"] : []),
-                        ...(formState.discountType === "shipping" ? ["Shipping Discount"] : [])
-                      ]}
-                      rows={(formState.configuration.markets || []).map((market, idx) => {
-                        const currency = `${getCurrencySymbol(market.currencyCode)} (${market.currencyCode})`;
-                        const isPrimary = idx === 0;
-                        const disabled = !market.active;
-                        const baseColumns = [
-                          <div style={{ fontWeight: isPrimary ? 600 : 400, background: isPrimary ? '#f4f6f8' : undefined, padding: '4px 8px', borderRadius: 4 }}>{market.marketName} {currency} {isPrimary && <span style={{ color: '#007b5c', fontWeight: 700 }}>(Primary)</span>}</div>,
-                          <Checkbox
-                            label="Active"
-                            checked={!!market.active}
-                            onChange={(checked) => handleMarketConfigChange(market.marketId, "active", checked)}
-                          />,
-                          <TextField
-                            label="Start date"
-                            type="date"
-                            value={market.startDate || ""}
-                            onChange={(value) => handleMarketConfigChange(market.marketId, "startDate", value)}
-                            autoComplete="off"
-                            disabled={disabled}
-                          />,
-                          <TextField
-                            label="End date"
-                            type="date"
-                            value={market.endDate || ""}
-                            onChange={(value) => handleMarketConfigChange(market.marketId, "endDate", value)}
-                            autoComplete="off"
-                            disabled={disabled}
-                          />,
-                          <Checkbox
-                            label="Exclude on sale"
-                            checked={!!market.excludeOnSale}
-                            onChange={(checked) => handleMarketConfigChange(market.marketId, "excludeOnSale", checked)}
-                            disabled={disabled}
-                          />
-                        ];
-
-                        if (formState.discountType === "products_order") {
-                          return [
-                            ...baseColumns,
-                            <InlineStack gap="100">
-                              <Select
-                                label="Product discount type"
-                                options={[
-                                  { label: "%", value: "percentage" },
-                                  { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
-                                ]}
-                                value={market.cartLineType}
-                                onChange={(value) => handleMarketConfigChange(market.marketId, "cartLineType", value)}
-                                disabled={disabled}
-                              />
-                              {market.cartLineType === "percentage" ? (
-                                <TextField
-                                  label="Product discount percentage"
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={market.cartLinePercentage}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "cartLinePercentage", value)}
-                                  suffix="%"
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              ) : (
-                                <TextField
-                                  label="Product discount fixed value"
-                                  type="number"
-                                  min="0"
-                                  value={market.cartLineFixed}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "cartLineFixed", value)}
-                                  suffix={getCurrencySymbol(market.currencyCode)}
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              )}
-                            </InlineStack>,
-                            <InlineStack gap="100">
-                              <Select
-                                label="Order discount type"
-                                options={[
-                                  { label: "%", value: "percentage" },
-                                  { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
-                                ]}
-                                value={market.orderType}
-                                onChange={(value) => handleMarketConfigChange(market.marketId, "orderType", value)}
-                                disabled={disabled}
-                              />
-                              {market.orderType === "percentage" ? (
-                                <TextField
-                                  label="Order discount percentage"
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={market.orderPercentage}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "orderPercentage", value)}
-                                  suffix="%"
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              ) : (
-                                <TextField
-                                  label="Order discount fixed value"
-                                  type="number"
-                                  min="0"
-                                  value={market.orderFixed}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "orderFixed", value)}
-                                  suffix={getCurrencySymbol(market.currencyCode)}
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              )}
-                            </InlineStack>
-                          ];
-                        } else {
-                          return [
-                            ...baseColumns,
-                            <InlineStack gap="100">
-                              <Select
-                                label="Shipping discount type"
-                                options={[
-                                  { label: "%", value: "percentage" },
-                                  { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
-                                ]}
-                                value={market.deliveryType}
-                                onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryType", value)}
-                                disabled={disabled}
-                              />
-                              {market.deliveryType === "percentage" ? (
-                                <TextField
-                                  label="Shipping discount percentage"
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={market.deliveryPercentage}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryPercentage", value)}
-                                  suffix="%"
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              ) : (
-                                <TextField
-                                  label="Shipping discount fixed value"
-                                  type="number"
-                                  min="0"
-                                  value={market.deliveryFixed}
-                                  onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryFixed", value)}
-                                  suffix={getCurrencySymbol(market.currencyCode)}
-                                  autoComplete="off"
-                                  disabled={disabled}
-                                />
-                              )}
-                            </InlineStack>
-                          ];
-                        }
-                      })}
-                    />
-                  )}
-                  {(formState.configuration.markets || []).length > 0 && (
-                    <div style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
-                      <div>
-                        <b>Note:</b> Fixed value discounts are applied in the presentment currency for each market (shown above as code and symbol).
-                      </div>
-                      {formState.discountType === "products_order" && (
-                        <div>
-                          <b>How are items on sale identified?</b> Items are considered "on sale" if their <code>compare_at_price</code> is greater than their <code>price</code> in the market's currency.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </BlockStack>
-              </Box>
-            </Card>
-          </BlockStack>
-          <Layout.Section>
-            <PageActions
-              primaryAction={{
-                content: "Save discount",
-                loading: isLoading,
-                onAction: submit,
-              }}
-              secondaryActions={[
-                {
-                  content: "Discard",
-                  onAction: returnToDiscounts,
+    <>
+      <Layout>
+        {errorBanner}
+        {successBanner}
+        <Layout.Section>
+          <Form method="post" id="discount-form">
+            <input
+              type="hidden"
+              name="discount"
+              value={JSON.stringify({
+                title: formState.title,
+                method: formState.method,
+                code: formState.code,
+                combinesWith: formState.combinesWith,
+                discountClasses: deriveDiscountClassesFromMarkets(formState.configuration.markets, formState.discountType),
+                usageLimit:
+                  formState.usageLimit === ""
+                    ? null
+                    : parseInt(formState.usageLimit, 10),
+                appliesOncePerCustomer: formState.appliesOncePerCustomer,
+                startsAt: formState.startDate,
+                endsAt: formState.endDate,
+                customerSelection: {
+                  all: formState.eligibility === Eligibility.Everyone,
+                  customers: formState.selectedCustomers.map((c) => c.id),
+                  customerSegments: formState.selectedCustomerSegments.map(
+                    (s) => s.id,
+                  ),
                 },
-              ]}
+                configuration: {
+                  ...(formState.configuration.metafieldId
+                    ? { metafieldId: formState.configuration.metafieldId }
+                    : {}),
+                  collectionIds: formState.configuration.collectionIds || [],
+                  markets: formState.configuration.markets || [],
+                },
+              })}
             />
-          </Layout.Section>
-        </Form>
-      </Layout.Section>
-    </Layout>
+            <BlockStack gap="400">
+              {/* Method section */}
+              <Card>
+                <Box>
+                  <BlockStack gap="100">
+                    <Text variant="headingMd" as="h2">
+                      {isEditing ? "Edit discount" : "Create discount"}
+                    </Text>
+
+                    <Select
+                      label="Discount type"
+                      options={methodOptions}
+                      value={formState.method}
+                      onChange={(value: DiscountMethod) =>
+                        setField("method", value)
+                      }
+                      disabled={isEditing}
+                    />
+
+                    {formState.method === DiscountMethod.Automatic ? (
+                      <TextField
+                        label="Discount title"
+                        autoComplete="off"
+                        value={formState.title}
+                        onChange={(value) => setField("title", value)}
+                      />
+                    ) : (
+                      <TextField
+                        label="Discount code"
+                        autoComplete="off"
+                        value={formState.code}
+                        onChange={(value) => setField("code", value)}
+                        helpText="Customers will enter this discount code at checkout."
+                      />
+                    )}
+
+                    <Select
+                      label="What does this discount apply to?"
+                      options={[
+                        { label: "Products and/or Order Total", value: "products_order" },
+                        { label: "Shipping", value: "shipping" }
+                      ]}
+                      value={formState.discountType || "products_order"}
+                      onChange={(value) => {
+                        setField("discountType", value as DiscountType);
+                        // Update discount classes based on type
+                        if (value === "products_order") {
+                          setField("discountClasses", [DiscountClass.Product, DiscountClass.Order]);
+                        } else {
+                          setField("discountClasses", [DiscountClass.Shipping]);
+                        }
+                      }}
+                      helpText="Choose whether this discount reduces product prices/order total or shipping costs. This cannot be changed after creation."
+                      disabled={isEditing}
+                    />
+                  </BlockStack>
+                </Box>
+              </Card>
+
+              {formState.method === DiscountMethod.Code ? (
+                <>
+                  <UsageLimitsCard
+                    totalUsageLimit={formState.usageLimit || ""}
+                    onUsageLimitChange={(value) => setField("usageLimit", value)}
+                    oncePerCustomer={formState.appliesOncePerCustomer}
+                    onOncePerCustomerChange={(value) =>
+                      setField("appliesOncePerCustomer", value)
+                    }
+                  />
+                  <CustomerEligibilityCard
+                    eligibility={{
+                      value: formState.eligibility,
+                      onChange: (value) => setField("eligibility", value as Eligibility),
+                    }}
+                    selectedCustomers={{
+                      value: formState.selectedCustomers,
+                      onChange: (value) => setField("selectedCustomers", value),
+                    }}
+                    selectedCustomerSegments={{
+                      value: formState.selectedCustomerSegments,
+                      onChange: (value) =>
+                        setField("selectedCustomerSegments", value),
+                    }}
+                    customerSelector={
+                      <Button
+                        onClick={() => {
+                          setSearchResourceType("customer");
+                          setSearchModalOpen(true);
+                        }}
+                        fullWidth
+                      >
+                        Select customers
+                      </Button>
+                    }
+                    customerSegmentSelector={
+                      <Button
+                        onClick={() => {
+                          setSearchResourceType("customer_segment");
+                          setSearchModalOpen(true);
+                        }}
+                        fullWidth
+                      >
+                        Select customer segments
+                      </Button>
+                    }
+                  />
+                </>
+              ) : null}
+
+              {/* Discount Combinations section */}
+              <Card>
+                <Box>
+                  <BlockStack gap="100">
+                    <Text variant="headingMd" as="h2">
+                      Discount Combinations
+                    </Text>
+                    <Text as="p" variant="bodyMd">
+                      Select which types of other discounts this discount can be combined with.
+                    </Text>
+                    {formState.discountType === "products_order" ? (
+                      <>
+                        <Checkbox
+                          label="Other product discounts"
+                          checked={formState.combinesWith.productDiscounts}
+                          onChange={(checked) => setCombinesWith("productDiscounts", checked)}
+                        />
+                        <Checkbox
+                          label="Other order discounts"
+                          checked={formState.combinesWith.orderDiscounts}
+                          onChange={(checked) => setCombinesWith("orderDiscounts", checked)}
+                        />
+                        <Checkbox
+                          label="Shipping discounts"
+                          checked={formState.combinesWith.shippingDiscounts}
+                          onChange={(checked) => setCombinesWith("shippingDiscounts", checked)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Checkbox
+                          label="Product discounts"
+                          checked={formState.combinesWith.productDiscounts}
+                          onChange={(checked) => setCombinesWith("productDiscounts", checked)}
+                        />
+                        <Checkbox
+                          label="Order discounts"
+                          checked={formState.combinesWith.orderDiscounts}
+                          onChange={(checked) => setCombinesWith("orderDiscounts", checked)}
+                        />
+                      </>
+                    )}
+                  </BlockStack>
+                </Box>
+              </Card>
+
+              {/* Market Configuration section */}
+              <Card>
+                <Box>
+                  <BlockStack gap="100">
+                    <Text variant="headingMd" as="h2">
+                      Market-specific configuration
+                    </Text>
+                    <Text as="p" variant="bodyMd">
+                      Configure discount values per market. All values are in the presentment currency for each market.
+                    </Text>
+                    {(formState.configuration.markets || []).length > 0 && (
+                      <DataTable
+                        columnContentTypes={[
+                          'text', 'text', 'text', 'text', 'text',
+                          ...(formState.discountType === "products_order" ? ['text' as const, 'text' as const] : []),
+                          ...(formState.discountType === "shipping" ? ['text' as const] : [])
+                        ]}
+                        headings={[
+                          "Market",
+                          "Active",
+                          "Start",
+                          "End",
+                          "Exclude On Sale",
+                          ...(formState.discountType === "products_order" ? ["Product Discount", "Order Discount"] : []),
+                          ...(formState.discountType === "shipping" ? ["Shipping Discount"] : [])
+                        ]}
+                        rows={(formState.configuration.markets || []).map((market, idx) => {
+                          const currency = `${getCurrencySymbol(market.currencyCode)} (${market.currencyCode})`;
+                          const isPrimary = idx === 0;
+                          const disabled = !market.active;
+                          const baseColumns = [
+                            <div style={{ fontWeight: isPrimary ? 600 : 400, background: isPrimary ? '#f4f6f8' : undefined, padding: '4px 8px', borderRadius: 4 }}>{market.marketName} {currency} {isPrimary && <span style={{ color: '#007b5c', fontWeight: 700 }}>(Primary)</span>}</div>,
+                            <Checkbox
+                              label="Active"
+                              checked={!!market.active}
+                              onChange={(checked) => handleMarketConfigChange(market.marketId, "active", checked)}
+                            />,
+                            <TextField
+                              label="Start date"
+                              type="date"
+                              value={market.startDate || ""}
+                              onChange={(value) => handleMarketConfigChange(market.marketId, "startDate", value)}
+                              autoComplete="off"
+                              disabled={disabled}
+                            />,
+                            <TextField
+                              label="End date"
+                              type="date"
+                              value={market.endDate || ""}
+                              onChange={(value) => handleMarketConfigChange(market.marketId, "endDate", value)}
+                              autoComplete="off"
+                              disabled={disabled}
+                            />,
+                            <Checkbox
+                              label="Exclude on sale"
+                              checked={!!market.excludeOnSale}
+                              onChange={(checked) => handleMarketConfigChange(market.marketId, "excludeOnSale", checked)}
+                              disabled={disabled}
+                            />
+                          ];
+
+                          if (formState.discountType === "products_order") {
+                            return [
+                              ...baseColumns,
+                              <InlineStack gap="100">
+                                <Select
+                                  label="Product discount type"
+                                  options={[
+                                    { label: "%", value: "percentage" },
+                                    { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
+                                  ]}
+                                  value={market.cartLineType}
+                                  onChange={(value) => handleMarketConfigChange(market.marketId, "cartLineType", value)}
+                                  disabled={disabled}
+                                />
+                                {market.cartLineType === "percentage" ? (
+                                  <TextField
+                                    label="Product discount percentage"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={market.cartLinePercentage}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "cartLinePercentage", value)}
+                                    suffix="%"
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                ) : (
+                                  <TextField
+                                    label="Product discount fixed value"
+                                    type="number"
+                                    min="0"
+                                    value={market.cartLineFixed}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "cartLineFixed", value)}
+                                    suffix={getCurrencySymbol(market.currencyCode)}
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                )}
+                              </InlineStack>,
+                              <InlineStack gap="100">
+                                <Select
+                                  label="Order discount type"
+                                  options={[
+                                    { label: "%", value: "percentage" },
+                                    { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
+                                  ]}
+                                  value={market.orderType}
+                                  onChange={(value) => handleMarketConfigChange(market.marketId, "orderType", value)}
+                                  disabled={disabled}
+                                />
+                                {market.orderType === "percentage" ? (
+                                  <TextField
+                                    label="Order discount percentage"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={market.orderPercentage}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "orderPercentage", value)}
+                                    suffix="%"
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                ) : (
+                                  <TextField
+                                    label="Order discount fixed value"
+                                    type="number"
+                                    min="0"
+                                    value={market.orderFixed}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "orderFixed", value)}
+                                    suffix={getCurrencySymbol(market.currencyCode)}
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                )}
+                              </InlineStack>
+                            ];
+                          } else {
+                            return [
+                              ...baseColumns,
+                              <InlineStack gap="100">
+                                <Select
+                                  label="Shipping discount type"
+                                  options={[
+                                    { label: "%", value: "percentage" },
+                                    { label: getCurrencySymbol(market.currencyCode), value: "fixed" },
+                                  ]}
+                                  value={market.deliveryType}
+                                  onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryType", value)}
+                                  disabled={disabled}
+                                />
+                                {market.deliveryType === "percentage" ? (
+                                  <TextField
+                                    label="Shipping discount percentage"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={market.deliveryPercentage}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryPercentage", value)}
+                                    suffix="%"
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                ) : (
+                                  <TextField
+                                    label="Shipping discount fixed value"
+                                    type="number"
+                                    min="0"
+                                    value={market.deliveryFixed}
+                                    onChange={(value) => handleMarketConfigChange(market.marketId, "deliveryFixed", value)}
+                                    suffix={getCurrencySymbol(market.currencyCode)}
+                                    autoComplete="off"
+                                    disabled={disabled}
+                                  />
+                                )}
+                              </InlineStack>
+                            ];
+                          }
+                        })}
+                      />
+                    )}
+                    {(formState.configuration.markets || []).length > 0 && (
+                      <div style={{ marginTop: 12, fontSize: 13, color: '#666' }}>
+                        <div>
+                          <b>Note:</b> Fixed value discounts are applied in the presentment currency for each market (shown above as code and symbol).
+                        </div>
+                        {formState.discountType === "products_order" && (
+                          <div>
+                            <b>How are items on sale identified?</b> Items are considered "on sale" if their <code>compare_at_price</code> is greater than their <code>price</code> in the market's currency.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </BlockStack>
+                </Box>
+              </Card>
+            </BlockStack>
+            <Layout.Section>
+              <PageActions
+                primaryAction={{
+                  content: "Save discount",
+                  loading: isLoading,
+                  onAction: submit,
+                }}
+                secondaryActions={[
+                  {
+                    content: "Discard",
+                    onAction: returnToDiscounts,
+                  },
+                ]}
+              />
+            </Layout.Section>
+          </Form>
+        </Layout.Section>
+      </Layout>
+      <CustomerSearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onSelect={handleSearchModalSelect}
+        resourceType={searchResourceType}
+      />
+    </>
   );
 }
 

@@ -23,7 +23,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { apiKey, functions } = useLoaderData<typeof loader>();
-  const newDiscountUrl = functions.length > 0 ? `/app/discount/${functions[0].id}/new` : '/app';
+  const newDiscountUrl =
+    functions.length > 0 ? `/app/discount/${functions[0].id}/new` : "/app";
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>

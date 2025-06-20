@@ -2,6 +2,8 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { Page } from "@shopify/polaris";
 import { Collection, DiscountClass } from "../types/admin.types.d";
+import { json } from "@remix-run/node";
+import { useMemo } from "react";
 
 import { DiscountForm } from "../components/DiscountForm/DiscountForm";
 import { NotFoundPage } from "../components/NotFoundPage";
@@ -25,6 +27,7 @@ interface ActionData {
 
 interface LoaderData {
   discount: {
+    id: string;
     title: string;
     method: DiscountMethod;
     code: string;
@@ -43,6 +46,7 @@ interface LoaderData {
       collectionIds: string[];
       markets: any[];
     };
+    customerSelection: any;
   } | null;
   collections: Collection[];
 }
@@ -67,8 +71,11 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     appliesOncePerCustomer,
     startsAt,
     endsAt,
+    customerSelection,
     configuration,
   } = JSON.parse(discountData);
+
+  const parsedUsageLimit = usageLimit ? parseInt(String(usageLimit), 10) : null;
 
   const baseDiscount = {
     functionId,
@@ -94,8 +101,9 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
       id,
       baseDiscount,
       code,
-      usageLimit,
+      parsedUsageLimit,
       appliesOncePerCustomer,
+      customerSelection,
       parsedConfiguration,
     );
   } else {
@@ -116,10 +124,19 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const { id } = params;
   if (!id) throw new Error("No discount ID provided");
 
-  const { discount } = await getDiscount(request, id);
+  const rawDiscountData = await getDiscount(request, id);
+
+  if (!rawDiscountData || !rawDiscountData.discount) {
+    throw new Response(null, {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
+
+  const { discount } = rawDiscountData;
 
   // Fetch collections if they exist in the configuration
-  const collections = discount?.configuration?.collectionIds
+  const collections = discount.configuration?.collectionIds
     ? await getCollectionsByIds(
         request,
         discount.configuration.collectionIds.map((id: string) =>
@@ -128,7 +145,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
       )
     : [];
 
-  return { discount, collections };
+  return json({
+    discount,
+    collections,
+  });
 };
 
 export default function VolumeEdit() {
@@ -146,27 +166,17 @@ export default function VolumeEdit() {
     return <NotFoundPage />;
   }
 
-  // Transform the discount data to match expected types
-  const initialData = {
-    ...rawDiscount,
-    method: rawDiscount.method,
-    discountClasses: rawDiscount.discountClasses,
-    combinesWith: {
-      orderDiscounts: rawDiscount.combinesWith.orderDiscounts,
-      productDiscounts: rawDiscount.combinesWith.productDiscounts,
-      shippingDiscounts: rawDiscount.combinesWith.shippingDiscounts,
-    },
-    usageLimit: rawDiscount.usageLimit,
-    appliesOncePerCustomer: rawDiscount.appliesOncePerCustomer,
-    startsAt: rawDiscount.startsAt,
-    endsAt: rawDiscount.endsAt,
-    configuration: {
-      metafieldId: rawDiscount.configuration.metafieldId,
-      collectionIds: rawDiscount.configuration.collectionIds || [],
-      markets: rawDiscount.configuration.markets || [],
-    },
-    discountType: rawDiscount.discountClasses.includes(DiscountClass.Shipping) ? "shipping" : "products_order",
-  };
+  // The discount data is now correctly shaped by the loader.
+  const initialData = useMemo(
+    () => ({
+      ...rawDiscount,
+      discountType:
+        rawDiscount.discountClasses?.includes(DiscountClass.Shipping)
+          ? "shipping"
+          : "products_order",
+    }),
+    [rawDiscount],
+  );
 
   return (
     <Page>
@@ -177,6 +187,7 @@ export default function VolumeEdit() {
       </ui-title-bar>
 
       <DiscountForm
+        key={rawDiscount.id}
         initialData={initialData}
         collections={collections}
         isEditing={true}
