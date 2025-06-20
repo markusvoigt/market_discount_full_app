@@ -34,6 +34,11 @@ Watch my [demo video](https://screenshot.click/18-54-ya2l2-yxx18.mp4) to see Dis
 - Overview dashboard of all active discounts
 - Market-specific discount management
 
+### Enterprise Features
+
+- **API Access**: For Enterprise clients, an offline access token is available on the "API Access" page. This token allows for programmatic management of discounts via the Shopify Admin API, enabling integration with external systems and custom workflows.
+- **Quick Discount Creation**: A "New Discount" link has been added to the main navigation menu, allowing for quick and easy creation of new market-specific discounts directly from anywhere in the app.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) version 16.x or higher
