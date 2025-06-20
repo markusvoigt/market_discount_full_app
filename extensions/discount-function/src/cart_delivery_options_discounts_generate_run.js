@@ -17,37 +17,24 @@ function isValidDateRange(marketConfig, shop) {
     : null;
   const endDate = marketConfig.endDate ? new Date(marketConfig.endDate) : null;
 
-  console.log("Date validation:", {
-    now: now.toISOString(),
-    startDate: startDate?.toISOString(),
-    endDate: endDate?.toISOString(),
-  });
-
   // If no dates are set, consider it valid
   if (!startDate && !endDate) {
-    console.log("No dates set - valid");
     return true;
   }
 
   // If only start date is set, check if it's not in the future
   if (startDate && !endDate) {
     // If there's no end date, the discount is valid as long as the start date has passed
-    const isValid = startDate <= now;
-    console.log("Only start date set - valid:", isValid);
-    return isValid;
+    return startDate <= now;
   }
 
   // If only end date is set, check if it's not in the past
   if (!startDate && endDate) {
-    const isValid = endDate >= now;
-    console.log("Only end date set - valid:", isValid);
-    return isValid;
+    return endDate >= now;
   }
 
   // Both dates are set, check if current date is within range
-  const isValid = startDate <= now && endDate >= now;
-  console.log("Both dates set - valid:", isValid);
-  return isValid;
+  return startDate <= now && endDate >= now;
 }
 
 /**
@@ -60,12 +47,13 @@ function isValidDateRange(marketConfig, shop) {
  * @returns {CartDeliveryOptionsDiscountsGenerateRunResult}
  */
 export function cartDeliveryOptionsDiscountsGenerateRun(input) {
-  const firstDeliveryGroup = input.cart.deliveryGroups[0];
+  const { cart, discount, localization, shop, triggeringDiscountCode } = input;
+  const firstDeliveryGroup = cart.deliveryGroups[0];
   if (!firstDeliveryGroup) {
     throw new Error("No delivery groups found");
   }
 
-  const hasShippingDiscountClass = input.discount.discountClasses.includes(
+  const hasShippingDiscountClass = discount.discountClasses.includes(
     DiscountClass.Shipping
   );
 
@@ -73,29 +61,29 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  let config = {};
-  if (input.discount.metafield?.value) {
+  let configuration = {};
+  if (discount.metafield?.value) {
     try {
-      config = JSON.parse(input.discount.metafield.value);
+      configuration = JSON.parse(discount.metafield.value);
     } catch (e) {
       console.error("Failed to parse metafield configuration:", e);
-      config = {};
+      configuration = {};
     }
   }
 
   let marketConfig = null;
-  if (Array.isArray(config.markets)) {
+  if (Array.isArray(configuration.markets)) {
     // First try to match by market ID as it's the most precise identifier
-    if (input.localization?.market?.id) {
-      marketConfig = config.markets.find(
-        (m) => m.marketId === input.localization.market.id && m.active
+    if (localization?.market?.id) {
+      marketConfig = configuration.markets.find(
+        (m) => m.marketId === localization.market.id && m.active
       );
     }
 
     // If no match by market ID, try country code
-    if (!marketConfig && input.localization?.country?.isoCode) {
-      const countryCode = input.localization.country.isoCode;
-      marketConfig = config.markets.find(
+    if (!marketConfig && localization?.country?.isoCode) {
+      const countryCode = localization.country.isoCode;
+      marketConfig = configuration.markets.find(
         (m) => m.countryCode === countryCode && m.active
       );
     }
@@ -107,7 +95,7 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
 
   // Check if the market configuration's date range is valid
-  if (!isValidDateRange(marketConfig, input.shop)) {
+  if (!isValidDateRange(marketConfig, shop)) {
     console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
@@ -121,16 +109,16 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   const deliveryPercentage = safeNumber(marketConfig.deliveryPercentage);
   const deliveryFixed = safeNumber(marketConfig.deliveryFixed);
 
+  const message = triggeringDiscountCode || configuration.title;
+
   // Create discount candidates for each delivery option
   const candidates = firstDeliveryGroup.deliveryOptions
     .map((option) => {
-      let value, message;
+      let value;
       if (deliveryType === "fixed" && deliveryFixed > 0) {
         value = { fixedAmount: { amount: deliveryFixed.toFixed(2) } };
-        message = `${deliveryFixed} ${option.cost.currencyCode} OFF DELIVERY`;
       } else if (deliveryPercentage > 0) {
         value = { percentage: { value: deliveryPercentage } };
-        message = `${deliveryPercentage}% OFF DELIVERY`;
       } else {
         return null;
       }
