@@ -198,10 +198,24 @@ export async function updateCodeDiscount(
           {
             id: configuration.metafieldId,
             value: JSON.stringify({
-              collectionIds: configuration.collectionIds?.map((id) =>
-                id.includes("gid://") ? id : `gid://shopify/Collection/${id}`,
-              ) || [],
-              markets: configuration.markets || [],
+              markets: (configuration.markets || []).map(market => ({
+                marketId: market.marketId,
+                marketName: market.marketName,
+                currencyCode: market.currencyCode,
+                startDate: market.startDate,
+                endDate: market.endDate,
+                excludeOnSale: market.excludeOnSale,
+                active: market.active,
+                cartLineType: market.cartLineType,
+                cartLinePercentage: market.cartLinePercentage,
+                cartLineFixed: market.cartLineFixed,
+                orderType: market.orderType,
+                orderPercentage: market.orderPercentage,
+                orderFixed: market.orderFixed,
+                deliveryType: market.deliveryType,
+                deliveryPercentage: market.deliveryPercentage,
+                deliveryFixed: market.deliveryFixed
+              })),
             }),
           },
         ],

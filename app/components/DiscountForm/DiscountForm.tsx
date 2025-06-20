@@ -23,6 +23,7 @@ import { CollectionPicker } from "../CollectionPicker/CollectionPicker";
 import { DatePickerField } from "../DatePickerField/DatePickerField";
 import { MarketConfig, DiscountType } from "../../types/form.types";
 import { GET_MARKETS } from "../../graphql/discounts";
+import { UsageLimitsCard } from "../UsageLimitsCard";
 
 interface SubmitError {
   message: string;
@@ -354,6 +355,17 @@ export function DiscountForm({
               </Box>
             </Card>
 
+            {formState.method === DiscountMethod.Code ? (
+              <UsageLimitsCard
+                totalUsageLimit={formState.usageLimit || ""}
+                onUsageLimitChange={(value) => setField("usageLimit", value)}
+                oncePerCustomer={formState.appliesOncePerCustomer}
+                onOncePerCustomerChange={(value) =>
+                  setField("appliesOncePerCustomer", value)
+                }
+              />
+            ) : null}
+
             {/* Discount Combinations section */}
             <Card>
               <Box>
@@ -414,8 +426,8 @@ export function DiscountForm({
                     <DataTable
                       columnContentTypes={[
                         'text', 'text', 'text', 'text', 'text',
-                        ...(formState.discountType === "products_order" ? ['text', 'text'] : []),
-                        ...(formState.discountType === "shipping" ? ['text'] : [])
+                        ...(formState.discountType === "products_order" ? ['text' as const, 'text' as const] : []),
+                        ...(formState.discountType === "shipping" ? ['text' as const] : [])
                       ]}
                       headings={[
                         "Market",

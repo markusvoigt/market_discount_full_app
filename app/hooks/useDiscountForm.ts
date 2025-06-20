@@ -26,11 +26,7 @@ interface FormState {
   title: string;
   method: DiscountMethod;
   code: string;
-  combinesWith: {
-    orderDiscounts: boolean;
-    productDiscounts: boolean;
-    shippingDiscounts: boolean;
-  };
+  combinesWith: CombinesWith;
   discountClasses: DiscountClass[];
   discountType: DiscountType;
   usageLimit: string;
