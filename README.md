@@ -4,7 +4,7 @@ Discountify is a powerful Shopify app that enables merchants to create and manag
 
 ## Demo
 
-Watch my [demo video](https://screenshot.click/18-54-ya2l2-yxx18.mp4) to see Discountify in action! The video showcases:
+Watch my [demo video](https://youtu.be/XlxvX66Lwko) to see Discountify in action! The video showcases:
 
 - Creating market-specific discounts
 - Setting up shipping discounts
