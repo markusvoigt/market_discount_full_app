@@ -105,6 +105,8 @@ export function DiscountForm({
       initialData: patchedInitialData,
     });
 
+    console.log("formState", formState);
+
   const [collections, setCollections] =
     useState<DiscountFormProps["collections"]>(initialCollections);
 
@@ -235,10 +237,11 @@ export function DiscountForm({
       fetch("/api/markets")
         .then((res) => res.json())
         .then((data) => {
+          console.log("data Markets Loaded", data);
           const loadedMarkets = data.markets.map((m: any) => ({
             marketId: m.id,
             marketName: m.name,
-            currencyCode: m.currencySettings.baseCurrency.currencyCode,
+            currencyCode: m.currencySettings?.baseCurrency?.currencyCode,
             cartLineType: "percentage" as const,
             cartLinePercentage: "0",
             cartLineFixed: "0",
@@ -259,6 +262,8 @@ export function DiscountForm({
           if (!formState.configuration.markets || formState.configuration.markets.length === 0) {
             setConfigField("markets", loadedMarkets);
           }
+        }).catch((error) => {
+          console.error("Error loading markets", error);
         });
     }
   }, [marketsLoaded, formState.configuration.markets, formState.startDate, formState.endDate, setConfigField]);

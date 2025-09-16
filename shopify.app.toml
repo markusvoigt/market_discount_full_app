@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "782da4ec9556f1761e350d7072bd7254"
-organization_id = "105895563"
+client_id = "60953dee72c5858002d3d0505b182fc2"
+organization_id = "3598980"
 name = "Discountify"
 application_url = "https://example.com"
 embedded = true
