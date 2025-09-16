@@ -31,7 +31,6 @@ import {
   DiscountType,
 } from "../../types/form.types";
 import { Eligibility } from "../../constants";
-import { GET_MARKETS } from "../../graphql/discounts";
 import { UsageLimitsCard } from "../UsageLimitsCard";
 import { CustomerEligibilityCard } from "../CustomerEligibilityCard/CustomerEligibilityCard";
 import { CustomerSearchModal } from "../CustomerSearchModal";
@@ -391,6 +390,25 @@ export function DiscountForm({
                       helpText="Choose whether this discount reduces product prices/order total or shipping costs. This cannot be changed after creation."
                       disabled={isEditing}
                     />
+
+                    {formState.discountType === "products_order" && (
+                      <Box paddingBlockStart="400">
+                        <BlockStack gap="200">
+                          <Text variant="headingXs" as="h4">
+                            Product Selection
+                          </Text>
+                          <Text as="p" variant="bodyMd">
+                            Choose which products this discount applies to. Leave empty to apply to all products.
+                          </Text>
+                          <CollectionPicker
+                            onSelect={handleCollectionSelect}
+                            selectedCollectionIds={formState.configuration.collectionIds || []}
+                            collections={collections}
+                            buttonText="Select collections"
+                          />
+                        </BlockStack>
+                      </Box>
+                    )}
                   </BlockStack>
                 </Box>
               </Card>
