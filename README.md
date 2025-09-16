@@ -60,7 +60,7 @@ cd market_discount_full_app
 
 **IMPORTANT**: You must configure your app credentials before installing dependencies.
 
-1. **Get your app credentials from Shopify Partner Dashboard**:
+1. **Get your app credentials from Shopify Dev Dashboard**:
 
    - Go to [your dev Dashboard](https://dev.shopify.com/dashboard/)
    - Navigate to your app or create a new app
@@ -290,7 +290,7 @@ shopify app dev
 
 **Solution**:
 
-1. Go to your [Shopify Partner Dashboard](https://partners.shopify.com)
+1. Go to your [Shopify dev Dashboard](https://dev.shopify.com/dashboard/)
 2. Find your app and copy the Client ID from the settings
 3. Update `shopify.app.toml`:
    ```toml
