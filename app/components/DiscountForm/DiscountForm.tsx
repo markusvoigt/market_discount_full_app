@@ -104,8 +104,6 @@ export function DiscountForm({
       initialData: patchedInitialData,
     });
 
-    console.log("formState", formState);
-
   const [collections, setCollections] =
     useState<DiscountFormProps["collections"]>(initialCollections);
 
@@ -236,7 +234,6 @@ export function DiscountForm({
       fetch("/api/markets")
         .then((res) => res.json())
         .then((data) => {
-          console.log("data Markets Loaded", data);
           const loadedMarkets = data.markets.map((m: any) => ({
             marketId: m.id,
             marketName: m.name,

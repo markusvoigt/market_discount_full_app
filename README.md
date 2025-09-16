@@ -44,7 +44,7 @@ Watch my [demo video](https://youtu.be/XlxvX66Lwko) to see Discountify in action
 - [Node.js](https://nodejs.org/) version 18.x or higher
 - [npm](https://www.npmjs.com/) version 9.x or higher
 - [Shopify CLI](https://shopify.dev/docs/apps/tools/cli) version 3.x or higher (install with `npm install -g @shopify/cli @shopify/theme`)
-- [Shopify Partner Account](https://partners.shopify.com/) with organization access
+- [Shopify Partner Account](https://partners.shopify.com/)
 - [Shopify Development Store](https://shopify.dev/docs/apps/tools/development-stores)
 
 ## Setup
@@ -244,6 +244,26 @@ Markets are configured through the app interface with the following options:
 - Discount amounts
 
 ## Troubleshooting
+
+### Common Issues
+
+1. **Function Deployment Fails**
+
+   - Ensure your function code passes all tests
+   - Check that your function configuration is valid
+   - Verify your Shopify CLI is up to date
+
+2. **Discount Not Applying**
+
+   - Verify market configuration
+   - Check date ranges
+   - Confirm currency settings
+   - Review sale item exclusion rules
+
+3. **Database Issues**
+   - Run latest migrations
+   - Check database connection string
+   - Verify Prisma schema matches your database
 
 ### Authentication Issues
 
