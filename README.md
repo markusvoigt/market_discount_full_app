@@ -62,10 +62,10 @@ cd market_discount_full_app
 
 1. **Get your app credentials from Shopify Partner Dashboard**:
 
-   - Go to [partners.shopify.com](https://partners.shopify.com)
+   - Go to [your dev Dashboard](https://dev.shopify.com/dashboard/)
    - Navigate to your app or create a new app
    - Copy your **Client ID** from the app settings
-   - Note your **Organization ID** from the URL (e.g., `partners.shopify.com/3598980/apps` → organization ID is `3598980`)
+   - Note your **Organization ID** from the URL (e.g., `dev.shopify.com/dashboard/XXXXXXX/apps` → organization ID is `XXXXXXX`)
 
 2. **Update `shopify.app.toml`** with your credentials:
 
