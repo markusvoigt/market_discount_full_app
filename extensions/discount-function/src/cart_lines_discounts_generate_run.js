@@ -27,9 +27,8 @@ export function cartLinesDiscountsGenerateRun(input) {
   if (discount.configuration?.value) {
     try {
       configuration = JSON.parse(discount.configuration.value);
-    } catch (e) {
-      console.error("Failed to parse metafield configuration:", e);
-      configuration = {};
+    } catch {
+      return { operations: [] };
     }
   }
 
@@ -50,12 +49,10 @@ export function cartLinesDiscountsGenerateRun(input) {
   }
 
   if (!marketConfig) {
-    console.log("No matching market configuration found");
     return { operations: [] };
   }
 
   if (!isValidDateRange(marketConfig, shop)) {
-    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
 

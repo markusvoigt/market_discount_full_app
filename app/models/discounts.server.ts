@@ -129,7 +129,7 @@ export async function createCodeDiscount(
         },
     metafields: [
       {
-        namespace: "$app:example-discounts--ui-extension",
+        namespace: "$app:discount-function",
         key: "function-configuration",
         type: "json",
         value: JSON.stringify({
@@ -182,7 +182,7 @@ export async function createAutomaticDiscount(
         ...baseDiscount,
         metafields: [
           {
-            namespace: "$app:example-discounts--ui-extension",
+            namespace: "$app:discount-function",
             key: "function-configuration",
             type: "json",
             value: JSON.stringify({
@@ -212,7 +212,7 @@ export async function updateCodeDiscount(
   configuration: {
     metafieldId: string;
     collectionIds?: string[];
-    markets?: any[];
+    markets?: MarketConfig[];
   },
 ) {
   const { admin } = await authenticate.admin(request);
@@ -297,7 +297,7 @@ export async function updateAutomaticDiscount(
   configuration: {
     metafieldId: string;
     collectionIds?: string[];
-    markets?: any[];
+    markets?: MarketConfig[];
   },
 ) {
   const { admin } = await authenticate.admin(request);
@@ -366,7 +366,8 @@ export async function getDiscount(request: Request, id: string) {
 
   // Find the configuration metafield
   const configurationMetafield = metafields.edges.find(
-    (edge: any) => edge.node.key === "function-configuration",
+    (edge: { node: { id: string; namespace: string; key: string; value: string } }) =>
+      edge.node.key === "function-configuration",
   )?.node;
 
   // Parse configuration from metafield
@@ -375,7 +376,7 @@ export async function getDiscount(request: Request, id: string) {
   const configuration = {
     collectionIds: configurationRaw.collectionIds ?? [],
     metafieldId: configurationMetafield?.id,
-    markets: (configurationRaw.markets || []).map((market: any) => ({
+    markets: (configurationRaw.markets || []).map((market: Partial<MarketConfig>) => ({
       ...market,
       startDate: market.startDate || now,
       endDate: market.endDate || null,
@@ -428,10 +429,24 @@ export async function getDiscount(request: Request, id: string) {
 
 export async function getDiscounts(request: Request) {
   const { admin } = await authenticate.admin(request);
-  const response = await admin.graphql(GET_ALL_DISCOUNTS);
-  const json = await response.json();
-  
-  return json.data.discountNodes.nodes.filter((node: DiscountNode) => {
+  const PAGE_SIZE = 50;
+  let allNodes: DiscountNode[] = [];
+  let hasNextPage = true;
+  let cursor: string | null = null;
+
+  while (hasNextPage) {
+    const response = await admin.graphql(GET_ALL_DISCOUNTS, {
+      variables: { first: PAGE_SIZE, after: cursor },
+    });
+    const json = await response.json() as { data: { discountNodes: { nodes: DiscountNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } } };
+    const { nodes, pageInfo } = json.data.discountNodes;
+
+    allNodes = allNodes.concat(nodes);
+    hasNextPage = pageInfo.hasNextPage;
+    cursor = pageInfo.endCursor;
+  }
+
+  return allNodes.filter((node: DiscountNode) => {
     if (!node.metafield?.value) return false;
 
     const now = new Date();
