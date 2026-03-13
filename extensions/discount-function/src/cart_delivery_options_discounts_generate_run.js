@@ -62,12 +62,11 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
 
   let configuration = {};
-  if (discount.metafield?.value) {
+  if (discount.configuration?.value) {
     try {
-      configuration = JSON.parse(discount.metafield.value);
-    } catch (e) {
-      console.error("Failed to parse metafield configuration:", e);
-      configuration = {};
+      configuration = JSON.parse(discount.configuration.value);
+    } catch {
+      return { operations: [] };
     }
   }
 
@@ -90,13 +89,10 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
 
   if (!marketConfig) {
-    console.log("No matching market configuration found");
     return { operations: [] };
   }
 
-  // Check if the market configuration's date range is valid
   if (!isValidDateRange(marketConfig, shop)) {
-    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
 

@@ -23,6 +23,13 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   if (!discountData || typeof discountData !== "string")
     throw new Error("No discount data provided");
 
+  let parsed;
+  try {
+    parsed = JSON.parse(discountData);
+  } catch {
+    return { errors: [{ message: "Invalid discount data", field: ["discount"] }] };
+  }
+
   const {
     title,
     method,
@@ -35,17 +42,33 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
     discountClasses,
     customerSelection,
     configuration,
-  } = JSON.parse(discountData);
+  } = parsed;
 
   const parsedUsageLimit = usageLimit ? parseInt(String(usageLimit), 10) : null;
+  if (parsedUsageLimit !== null && isNaN(parsedUsageLimit)) {
+    return { errors: [{ message: "Usage limit must be a valid number", field: ["usageLimit"] }] };
+  }
+
+  const parsedStartsAt = new Date(startsAt);
+  const parsedEndsAt = endsAt ? new Date(endsAt) : null;
+
+  if (isNaN(parsedStartsAt.getTime())) {
+    return { errors: [{ message: "Start date is invalid", field: ["startsAt"] }] };
+  }
+  if (parsedEndsAt && isNaN(parsedEndsAt.getTime())) {
+    return { errors: [{ message: "End date is invalid", field: ["endsAt"] }] };
+  }
+  if (parsedEndsAt && parsedEndsAt < parsedStartsAt) {
+    return { errors: [{ message: "End date must be after start date", field: ["endsAt"] }] };
+  }
 
   const baseDiscount = {
     functionId,
     title,
     combinesWith,
     discountClasses,
-    startsAt: new Date(startsAt),
-    endsAt: endsAt && new Date(endsAt),
+    startsAt: parsedStartsAt,
+    endsAt: parsedEndsAt,
   };
 
   let result;

@@ -204,6 +204,7 @@ export function DiscountForm({
   // Market-aware discount UI
   const [availableMarkets, setAvailableMarkets] = useState<MarketConfig[]>([]);
   const [marketsLoaded, setMarketsLoaded] = useState(false);
+  const [marketsError, setMarketsError] = useState<string | null>(null);
 
   // Helper to clean market config before saving
   const cleanMarketConfig = (market: MarketConfig) => {
@@ -234,7 +235,7 @@ export function DiscountForm({
       fetch("/api/markets")
         .then((res) => res.json())
         .then((data) => {
-          const loadedMarkets = data.markets.map((m: any) => ({
+          const loadedMarkets = data.markets.map((m: { id: string; name: string; currencySettings?: { baseCurrency?: { currencyCode: string } } }) => ({
             marketId: m.id,
             marketName: m.name,
             currencyCode: m.currencySettings?.baseCurrency?.currencyCode,
@@ -258,14 +259,14 @@ export function DiscountForm({
           if (!formState.configuration.markets || formState.configuration.markets.length === 0) {
             setConfigField("markets", loadedMarkets);
           }
-        }).catch((error) => {
-          console.error("Error loading markets", error);
+        }).catch(() => {
+          setMarketsError("Failed to load markets. Please reload the page to try again.");
         });
     }
   }, [marketsLoaded, formState.configuration.markets, formState.startDate, formState.endDate, setConfigField]);
 
   // Override setMarketConfigField to clean values
-  const handleMarketConfigChange = (marketId: string, field: keyof MarketConfig, value: any) => {
+  const handleMarketConfigChange = (marketId: string, field: keyof MarketConfig, value: MarketConfig[keyof MarketConfig]) => {
     const market = formState.configuration.markets?.find(m => m.marketId === marketId);
     if (market) {
       const updatedMarket = cleanMarketConfig({ ...market, [field]: value });
@@ -285,11 +286,11 @@ export function DiscountForm({
     return symbols[code] || code;
   };
 
-  const handleSearchModalSelect = (selection: any[]) => {
+  const handleSearchModalSelect = (selection: Customer[] | CustomerSegment[]) => {
     if (searchResourceType === "customer") {
-      setField("selectedCustomers", selection);
+      setField("selectedCustomers", selection as Customer[]);
     } else {
-      setField("selectedCustomerSegments", selection);
+      setField("selectedCustomerSegments", selection as CustomerSegment[]);
     }
   };
 
@@ -516,6 +517,11 @@ export function DiscountForm({
                     <Text as="p" variant="bodyMd">
                       Configure discount values per market. All values are in the presentment currency for each market.
                     </Text>
+                    {marketsError && (
+                      <Banner tone="critical">
+                        <p>{marketsError}</p>
+                      </Banner>
+                    )}
                     {(formState.configuration.markets || []).length > 0 && (
                       <DataTable
                         columnContentTypes={[
