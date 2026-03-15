@@ -1,169 +1,159 @@
-import {describe, it, expect} from "vitest";
-
-import {cartLinesDiscountsGenerateRun} from "./cart_lines_discounts_generate_run";
+import { describe, it, expect } from "vitest";
+import { cartLinesDiscountsGenerateRun } from "./cart_lines_discounts_generate_run";
 import {
-  OrderDiscountSelectionStrategy,
-  ProductDiscountSelectionStrategy,
   DiscountClass,
+  ProductDiscountSelectionStrategy,
 } from "../generated/api";
 
-/**
-  * @typedef {import("../generated/api").CartLinesDiscountsGenerateRunResult} CartLinesDiscountsGenerateRunResult
-  */
-
-describe("cartLinesDiscountsGenerateRun", () => {
-  const baseInput = {
+function makeInput(overrides = {}) {
+  return {
     cart: {
       lines: [
         {
           id: "gid://shopify/CartLine/0",
+          quantity: 1,
           cost: {
-            subtotalAmount: {
-              amount: 100,
-            },
+            subtotalAmount: { amount: "100" },
+            compareAtAmountPerQuantity: null,
           },
         },
       ],
     },
     discount: {
-      discountClasses: [],
-    },
-  };
-
-  it("returns empty operations when no discount classes are present", () => {
-    const input = {
-      ...baseInput,
-      discount: {
-        discountClasses: [],
+      discountClasses: [DiscountClass.Product],
+      configuration: {
+        value: JSON.stringify({
+          markets: [
+            {
+              marketId: "gid://shopify/Market/1",
+              active: true,
+              cartLineType: "percentage",
+              cartLinePercentage: "10",
+              excludeOnSale: false,
+            },
+          ],
+        }),
       },
-    };
+    },
+    localization: {
+      market: { id: "gid://shopify/Market/1" },
+      country: { isoCode: "US" },
+      language: { isoCode: "EN" },
+    },
+    shop: {
+      localTime: { date: "2026-01-15" },
+    },
+    ...overrides,
+  };
+}
 
+describe("cartLinesDiscountsGenerateRun", () => {
+  it("returns product discount for matching market", () => {
+    const result = cartLinesDiscountsGenerateRun(makeInput());
+    expect(result.operations).toHaveLength(1);
+    expect(result.operations[0].productDiscountsAdd).toBeDefined();
+    expect(
+      result.operations[0].productDiscountsAdd.candidates[0].value.percentage.value
+    ).toBe(10);
+  });
+
+  it("returns empty operations when no matching market", () => {
+    const input = makeInput({
+      localization: {
+        market: { id: "gid://shopify/Market/999" },
+        country: { isoCode: "XX" },
+        language: { isoCode: "EN" },
+      },
+    });
     const result = cartLinesDiscountsGenerateRun(input);
     expect(result.operations).toHaveLength(0);
   });
 
-  it("returns only order discount when only order discount class is present", () => {
-    const input = {
-      ...baseInput,
-      discount: {
-        discountClasses: [DiscountClass.Order],
-      },
-    };
-
-    const result = cartLinesDiscountsGenerateRun(input);
-    expect(result.operations).toHaveLength(1);
-    expect(result.operations[0]).toMatchObject({
-      orderDiscountsAdd: {
-        candidates: [
+  it("returns empty operations when all items on sale and excludeOnSale is enabled", () => {
+    const input = makeInput({
+      cart: {
+        lines: [
           {
-            message: "10% OFF ORDER",
-            targets: [
-              {
-                orderSubtotal: {
-                  excludedCartLineIds: [],
-                },
-              },
-            ],
-            value: {
-              percentage: {
-                value: 10,
-              },
+            id: "gid://shopify/CartLine/0",
+            quantity: 1,
+            cost: {
+              subtotalAmount: { amount: "80" },
+              compareAtAmountPerQuantity: { amount: "100" },
             },
           },
         ],
-        selectionStrategy: OrderDiscountSelectionStrategy.First,
       },
-    });
-  });
-
-  it("returns only product discount when only product discount class is present", () => {
-    const input = {
-      ...baseInput,
       discount: {
         discountClasses: [DiscountClass.Product],
-      },
-    };
-
-    const result = cartLinesDiscountsGenerateRun(input);
-    expect(result.operations).toHaveLength(1);
-    expect(result.operations[0]).toMatchObject({
-      productDiscountsAdd: {
-        candidates: [
-          {
-            message: "20% OFF PRODUCT",
-            targets: [
+        configuration: {
+          value: JSON.stringify({
+            markets: [
               {
-                cartLine: {
-                  id: "gid://shopify/CartLine/0",
-                },
+                marketId: "gid://shopify/Market/1",
+                active: true,
+                cartLineType: "percentage",
+                cartLinePercentage: "10",
+                excludeOnSale: true,
               },
             ],
-            value: {
-              percentage: {
-                value: 20,
-              },
-            },
-          },
-        ],
-        selectionStrategy: ProductDiscountSelectionStrategy.First,
+          }),
+        },
       },
     });
+    const result = cartLinesDiscountsGenerateRun(input);
+    expect(result.operations).toHaveLength(0);
   });
 
-  it("returns both discounts when both discount classes are present", () => {
-    const input = {
-      ...baseInput,
+  it("applies discount when compareAt equals price (not on sale)", () => {
+    const input = makeInput({
+      cart: {
+        lines: [
+          {
+            id: "gid://shopify/CartLine/0",
+            quantity: 1,
+            cost: {
+              subtotalAmount: { amount: "39.99" },
+              compareAtAmountPerQuantity: { amount: "39.99" },
+            },
+          },
+        ],
+      },
       discount: {
-        discountClasses: [DiscountClass.Order, DiscountClass.Product],
+        discountClasses: [DiscountClass.Product],
+        configuration: {
+          value: JSON.stringify({
+            markets: [
+              {
+                marketId: "gid://shopify/Market/1",
+                active: true,
+                cartLineType: "percentage",
+                cartLinePercentage: "10",
+                excludeOnSale: true,
+              },
+            ],
+          }),
+        },
       },
-    };
-
+    });
     const result = cartLinesDiscountsGenerateRun(input);
-    expect(result.operations).toHaveLength(2);
-    expect(result.operations[0]).toMatchObject({
-      orderDiscountsAdd: {
-        candidates: [
-          {
-            message: "10% OFF ORDER",
-            targets: [
-              {
-                orderSubtotal: {
-                  excludedCartLineIds: [],
-                },
-              },
-            ],
-            value: {
-              percentage: {
-                value: 10,
-              },
-            },
-          },
-        ],
-        selectionStrategy: OrderDiscountSelectionStrategy.First,
-      },
-    });
+    expect(result.operations).toHaveLength(1);
+    expect(result.operations[0].productDiscountsAdd).toBeDefined();
+  });
 
-    expect(result.operations[1]).toMatchObject({
-      productDiscountsAdd: {
-        candidates: [
-          {
-            message: "20% OFF PRODUCT",
-            targets: [
-              {
-                cartLine: {
-                  id: "gid://shopify/CartLine/0",
-                },
-              },
-            ],
-            value: {
-              percentage: {
-                value: 20,
-              },
-            },
-          },
-        ],
-        selectionStrategy: ProductDiscountSelectionStrategy.First,
+  it("returns empty operations when no cart lines", () => {
+    const input = makeInput({ cart: { lines: [] } });
+    const result = cartLinesDiscountsGenerateRun(input);
+    expect(result.operations).toHaveLength(0);
+  });
+
+  it("returns empty operations when discount class does not include Product", () => {
+    const input = makeInput({
+      discount: {
+        discountClasses: [DiscountClass.Shipping],
+        configuration: { value: "{}" },
       },
     });
+    const result = cartLinesDiscountsGenerateRun(input);
+    expect(result.operations).toHaveLength(0);
   });
 });

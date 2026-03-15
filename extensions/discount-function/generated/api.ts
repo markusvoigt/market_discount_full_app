@@ -107,18 +107,13 @@ export type Attribute = {
  */
 export type BuyerIdentity = {
   __typename?: 'BuyerIdentity';
-  /**
-   * The customer that's interacting with the cart. A customer is a buyer who has an
-   * [account](https://help.shopify.com/manual/customers/customer-accounts) with the store.
-   */
+  /** The [customer](https://help.shopify.com/manual/customers/manage-customers) that's interacting with the cart. */
   customer?: Maybe<Customer>;
   /** The email address of the customer that's interacting with the cart. */
   email?: Maybe<Scalars['String']['output']>;
   /**
    * Whether the customer is authenticated through their
    * [customer account](https://help.shopify.com/manual/customers/customer-accounts).
-   * If the customer is authenticated, then the `customer` field returns the customer's information.
-   * If the customer isn't authenticated, then the `customer` field returns `null`.
    */
   isAuthenticated: Scalars['Boolean']['output'];
   /** The phone number of the customer that's interacting with the cart. */
@@ -134,7 +129,7 @@ export type BuyerIdentity = {
  * The cart where the Function is running. A cart contains the merchandise that a customer intends to purchase
  * and information about the customer, such as the customer's email address and phone number.
  */
-export type Cart = {
+export type Cart = HasMetafields & {
   __typename?: 'Cart';
   /**
    * The custom attributes associated with a cart to store additional information. Cart attributes
@@ -161,6 +156,13 @@ export type Cart = {
    * fulfillment by organizing items that can be shipped together, based on the customer's
    * shipping address. For example, if a customer orders a t-shirt and a pair of shoes that can be shipped
    * together, then the items are included in the same delivery group.
+   *
+   * In the [Order Discount](https://shopify.dev/docs/api/functions/reference/order-discounts) and
+   * [Product Discount](https://shopify.dev/docs/api/functions/reference/product-discounts) legacy APIs,
+   * the `cart.deliveryGroups` input is always an empty array. This means you can't access delivery groups when
+   * creating Order Discount or Product Discount Functions. If you need to apply discounts to shipping costs,
+   * then use the [Discount Function API](https://shopify.dev/docs/api/functions/reference/discount)
+   * instead.
    */
   deliveryGroups: Array<CartDeliveryGroup>;
   /**
@@ -174,6 +176,16 @@ export type Cart = {
    * such as customs information or tax identification numbers.
    */
   localizedFields: Array<LocalizedField>;
+  /**
+   * A [custom field](https://shopify.dev/docs/apps/build/custom-data) that stores additional information
+   * about a Shopify resource, such as products, orders, and
+   * [many more](https://shopify.dev/docs/api/admin-graphql/latest/enums/MetafieldOwnerType).
+   * Using [metafields with Shopify Functions](https://shopify.dev/docs/apps/build/functions/input-output/metafields-for-input-queries)
+   * enables you to customize the checkout experience.
+   */
+  metafield?: Maybe<Metafield>;
+  /** The physical location where a retail order is created or completed. */
+  retailLocation?: Maybe<Location>;
 };
 
 
@@ -194,13 +206,23 @@ export type CartLocalizedFieldsArgs = {
   keys?: Array<LocalizedFieldKey>;
 };
 
+
+/**
+ * The cart where the Function is running. A cart contains the merchandise that a customer intends to purchase
+ * and information about the customer, such as the customer's email address and phone number.
+ */
+export type CartMetafieldArgs = {
+  key: Scalars['String']['input'];
+  namespace?: InputMaybe<Scalars['String']['input']>;
+};
+
 /**
  * A breakdown of the costs that the customer will pay at checkout. It includes the total amount,
  * the subtotal before taxes and duties, the tax amount, and duty charges.
  */
 export type CartCost = {
   __typename?: 'CartCost';
-  /** The amount for the customer to pay at checkout, excluding taxes and discounts. */
+  /** The amount, before taxes and cart-level discounts, for the customer to pay. */
   subtotalAmount: MoneyV2;
   /** The total amount for the customer to pay at checkout. */
   totalAmount: MoneyV2;
@@ -231,6 +253,8 @@ export type CartDeliveryGroup = {
    * can choose to have their orders shipped. Examples include express shipping or standard shipping.
    */
   deliveryOptions: Array<CartDeliveryOption>;
+  /** The type of merchandise in the delivery group. */
+  groupType: CartDeliveryGroupType;
   /**
    * A [globally-unique ID](https://shopify.dev/docs/api/usage/gids)
    * for the delivery group.
@@ -239,6 +263,17 @@ export type CartDeliveryGroup = {
   /** Information about the delivery option that the customer has selected. */
   selectedDeliveryOption?: Maybe<CartDeliveryOption>;
 };
+
+/** Defines what type of merchandise is in the delivery group. */
+export enum CartDeliveryGroupType {
+  /**
+   * The delivery group only contains merchandise that is either a one time purchase or a first delivery of
+   * subscription merchandise.
+   */
+  OneTimePurchase = 'ONE_TIME_PURCHASE',
+  /** The delivery group only contains subscription merchandise. */
+  Subscription = 'SUBSCRIPTION'
+}
 
 /**
  * Information about a delivery option that's available for an item in a cart. Delivery options are the different
@@ -306,7 +341,7 @@ export type CartLine = {
    * gift wrapping requests, or custom product details. Attributes are stored as key-value pairs.
    *
    * Cart line attributes are equivalent to the
-   * [`line_item`](https://shopify.dev/docs/apps/build/purchase-options/subscriptions/selling-plans)
+   * [`line_item`](https://shopify.dev/docs/api/liquid/objects/line_item)
    * object in Liquid.
    */
   attribute?: Maybe<Attribute>;
@@ -320,6 +355,11 @@ export type CartLine = {
   id: Scalars['ID']['output'];
   /** The item that the customer intends to purchase. */
   merchandise: Merchandise;
+  /**
+   * The [nested relationship](https://shopify.dev/docs/apps/build/product-merchandising/nested-cart-lines)
+   * between this line and its parent line, if any.
+   */
+  parentRelationship?: Maybe<CartLineParentRelationship>;
   /** The quantity of the item that the customer intends to purchase. */
   quantity: Scalars['Int']['output'];
   /**
@@ -352,7 +392,7 @@ export type CartLineCost = {
    */
   amountPerQuantity: MoneyV2;
   /**
-   * The cost of a single unit before any discounts are applied. This field is used to calculate and display
+   * The `compareAt` price of a single unit before any discounts are applied. This field is used to calculate and display
    * savings for customers. For example, if a product's `compareAtAmountPerQuantity` is $25 and its current price
    * is $20, then the customer sees a $5 discount. This value can change based on the buyer's identity and is
    * `null` when the value is hidden from buyers.
@@ -386,8 +426,15 @@ export type CartLineMinimumSubtotal = {
    * minimum subtotal purchased to receive the discount.
    */
   ids: Array<Scalars['ID']['input']>;
-  /** The minimum subtotal amount of the cart line to be eligible for a discount candidate. */
+  /** The minimum subtotal amount of the cart line to be eligible for a discount candidate in the shop's currency. */
   minimumAmount: Scalars['Decimal']['input'];
+};
+
+/** Represents the relationship between a cart line and its parent line. */
+export type CartLineParentRelationship = {
+  __typename?: 'CartLineParentRelationship';
+  /** The parent line in the relationship. */
+  parent: CartLine;
 };
 
 /**
@@ -428,11 +475,17 @@ export type CartOperation =
    * An operation that selects which entered discount codes to accept. Use this to
    * validate discount codes from external systems.
    */
-  { enteredDiscountCodesAccept: EnteredDiscountCodesAcceptOperation; orderDiscountsAdd?: never; productDiscountsAdd?: never; }
+  { enteredDiscountCodesAccept: EnteredDiscountCodesAcceptOperation; enteredDiscountCodesReject?: never; orderDiscountsAdd?: never; productDiscountsAdd?: never; }
+  |  /**
+   * An operation that rejects entered discount codes with a custom message. Use
+   * this to conditionally reject discount codes based on business logic. This
+   * operation can only be used if the function is backed by an automatic discount.
+   */
+  { enteredDiscountCodesAccept?: never; enteredDiscountCodesReject: EnteredDiscountCodesRejectOperation; orderDiscountsAdd?: never; productDiscountsAdd?: never; }
   |  /** An operation that applies order discounts to a cart that share a selection strategy. */
-  { enteredDiscountCodesAccept?: never; orderDiscountsAdd: OrderDiscountsAddOperation; productDiscountsAdd?: never; }
+  { enteredDiscountCodesAccept?: never; enteredDiscountCodesReject?: never; orderDiscountsAdd: OrderDiscountsAddOperation; productDiscountsAdd?: never; }
   |  /** An operation that applies product discounts to a cart that share a selection strategy. */
-  { enteredDiscountCodesAccept?: never; orderDiscountsAdd?: never; productDiscountsAdd: ProductDiscountsAddOperation; };
+  { enteredDiscountCodesAccept?: never; enteredDiscountCodesReject?: never; orderDiscountsAdd?: never; productDiscountsAdd: ProductDiscountsAddOperation; };
 
 /**
  * Whether the product is in the specified collection.
@@ -527,6 +580,10 @@ export type CompanyLocation = HasMetafields & {
   metafield?: Maybe<Metafield>;
   /** The name of the company location. */
   name: Scalars['String']['output'];
+  /** The number of orders placed at this company location. */
+  ordersCount: Scalars['Int']['output'];
+  /** The total amount spent at this company location. */
+  totalSpent: MoneyV2;
   /**
    * The date and time ([ISO 8601 format](http://en.wikipedia.org/wiki/ISO_8601))
    * at which the company location was last modified.
@@ -1061,8 +1118,9 @@ export enum CountryCode {
 }
 
 /**
- * The three-letter currency codes that represent the world currencies used in stores. Currency codes include
- * [standard ISO 4217 codes](https://en.wikipedia.org/wiki/ISO_4217), legacy codes, and non-standard codes.
+ * The currency codes that represent the world currencies throughout the Admin API. Currency codes include
+ * [standard ISO 4217 codes](https://en.wikipedia.org/wiki/ISO_4217), legacy codes, non-standard codes,
+ * digital currency codes.
  */
 export enum CurrencyCode {
   /** United Arab Emirates Dirham (AED). */
@@ -1115,7 +1173,7 @@ export enum CurrencyCode {
   Byn = 'BYN',
   /**
    * Belarusian Ruble (BYR).
-   * @deprecated `BYR` is deprecated. Use `BYN` available from version `2021-01` onwards instead.
+   * @deprecated Use `BYN` instead.
    */
   Byr = 'BYR',
   /** Belize Dollar (BZD). */
@@ -1328,7 +1386,7 @@ export enum CurrencyCode {
   Ssp = 'SSP',
   /**
    * Sao Tome And Principe Dobra (STD).
-   * @deprecated `STD` is deprecated. Use `STN` available from version `2022-07` onwards instead.
+   * @deprecated Use `STN` instead.
    */
   Std = 'STD',
   /** Sao Tome And Principe Dobra (STN). */
@@ -1361,6 +1419,8 @@ export enum CurrencyCode {
   Ugx = 'UGX',
   /** United States Dollars (USD). */
   Usd = 'USD',
+  /** United States Dollars Coin (USDC). */
+  Usdc = 'USDC',
   /** Uruguayan Pesos (UYU). */
   Uyu = 'UYU',
   /** Uzbekistan som (UZS). */
@@ -1369,7 +1429,7 @@ export enum CurrencyCode {
   Ved = 'VED',
   /**
    * Venezuelan Bolivares (VEF).
-   * @deprecated `VEF` is deprecated. Use `VES` available from version `2020-10` onwards instead.
+   * @deprecated Use `VES` instead.
    */
   Vef = 'VEF',
   /** Venezuelan Bolivares Soberanos (VES). */
@@ -1427,8 +1487,7 @@ export type CustomProduct = {
 };
 
 /**
- * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers)
- * who has an [account](https://help.shopify.com/manual/customers/customer-accounts) with the store.
+ * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers).
  * `Customer` returns data including the customer's contact information and order history.
  */
 export type Customer = HasMetafields & {
@@ -1453,10 +1512,7 @@ export type Customer = HasMetafields & {
    * from the list to return `true`.
    */
   hasAnyTag: Scalars['Boolean']['output'];
-  /**
-   * Whether the customer is associated with the specified tags. The customer must have all of the tags in the list
-   * to return `true`.
-   */
+  /** Whether the customer is associated with the specified tags. */
   hasTags: Array<HasTagResponse>;
   /**
    * A [globally-unique ID](https://shopify.dev/docs/api/usage/gids)
@@ -1479,8 +1535,7 @@ export type Customer = HasMetafields & {
 
 
 /**
- * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers)
- * who has an [account](https://help.shopify.com/manual/customers/customer-accounts) with the store.
+ * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers).
  * `Customer` returns data including the customer's contact information and order history.
  */
 export type CustomerHasAnyTagArgs = {
@@ -1489,8 +1544,7 @@ export type CustomerHasAnyTagArgs = {
 
 
 /**
- * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers)
- * who has an [account](https://help.shopify.com/manual/customers/customer-accounts) with the store.
+ * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers).
  * `Customer` returns data including the customer's contact information and order history.
  */
 export type CustomerHasTagsArgs = {
@@ -1499,8 +1553,7 @@ export type CustomerHasTagsArgs = {
 
 
 /**
- * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers)
- * who has an [account](https://help.shopify.com/manual/customers/customer-accounts) with the store.
+ * Represents a [customer](https://help.shopify.com/manual/customers/manage-customers).
  * `Customer` returns data including the customer's contact information and order history.
  */
 export type CustomerMetafieldArgs = {
@@ -1517,7 +1570,7 @@ export type DeliverableCartLine = {
    * gift wrapping requests, or custom product details. Attributes are stored as key-value pairs.
    *
    * Cart line attributes are equivalent to the
-   * [`line_item`](https://shopify.dev/docs/apps/build/purchase-options/subscriptions/selling-plans)
+   * [`line_item`](https://shopify.dev/docs/api/liquid/objects/line_item)
    * object in Liquid.
    */
   attribute?: Maybe<Attribute>;
@@ -1537,11 +1590,17 @@ export type DeliverableCartLineAttributeArgs = {
 
 /** The discount that's eligible to be applied to a delivery. */
 export type DeliveryDiscountCandidate = {
-  /** The discount code that's eligible to be applied to a delivery. */
+  /**
+   * An optional discount code associated with this discount candidate, for use
+   * with automatic discounts. If a code discount is the function trigger, the
+   * associated discount code will be overwritten by the triggering discount code.
+   */
   associatedDiscountCode?: InputMaybe<AssociatedDiscountCode>;
   /**
-   * A notification that informs customers about available discounts.
-   * The message is displayed on the **Cart** page. For example, "Save 20% on all t-shirts."
+   * A notification on the **Cart** page informs customers about available
+   * discounts. If an automatic discount applies, the notification displays this
+   * message, such as "Save 20% on all t-shirts." If a discount code is entered,
+   * the notification displays the code instead.
    */
   message?: InputMaybe<Scalars['String']['input']>;
   /** The targets of the discount that are eligible to be applied to a delivery. */
@@ -1640,12 +1699,18 @@ export type DeliveryOperation =
    * Applies delivery discounts to a cart that share a method for determining which
    * shipping and delivery discounts to apply when multiple discounts are eligible.
    */
-  { deliveryDiscountsAdd: DeliveryDiscountsAddOperation; enteredDiscountCodesAccept?: never; }
+  { deliveryDiscountsAdd: DeliveryDiscountsAddOperation; enteredDiscountCodesAccept?: never; enteredDiscountCodesReject?: never; }
   |  /**
    * An operation that selects which entered discount codes to accept. Use this to
    * validate discount codes from external systems.
    */
-  { deliveryDiscountsAdd?: never; enteredDiscountCodesAccept: EnteredDiscountCodesAcceptOperation; };
+  { deliveryDiscountsAdd?: never; enteredDiscountCodesAccept: EnteredDiscountCodesAcceptOperation; enteredDiscountCodesReject?: never; }
+  |  /**
+   * An operation that rejects entered discount codes with a custom message. Use
+   * this to conditionally reject discount codes based on business logic. This
+   * operation can only be used if the function is backed by an automatic discount.
+   */
+  { deliveryDiscountsAdd?: never; enteredDiscountCodesAccept?: never; enteredDiscountCodesReject: EnteredDiscountCodesRejectOperation; };
 
 /**
  * A method for applying a discount to a delivery option within a delivery group.
@@ -1660,7 +1725,7 @@ export type DeliveryOptionTarget = {
 /** The discount that invoked the [Discount Function](https://shopify.dev/docs/apps/build/discounts#build-with-shopify-functions)). */
 export type Discount = HasMetafields & {
   __typename?: 'Discount';
-  /** The [discount classes](https://shopify.dev/docs/apps/build/discounts/#discount-classes)) that the [discountNode](https://shopify.dev/docs/api/admin-graphql/latest/queries/discountNode)) supports. */
+  /** The [discount classes](https://shopify.dev/docs/apps/build/discounts/#discount-classes) that the [discountNode](https://shopify.dev/docs/api/admin-graphql/latest/queries/discountNode) supports. */
   discountClasses: Array<DiscountClass>;
   /**
    * A [custom field](https://shopify.dev/docs/apps/build/custom-data) that stores additional information
@@ -1710,10 +1775,35 @@ export type DiscountCode = {
   code: Scalars['String']['input'];
 };
 
+/** A discount code entered by the customer. */
+export type EnteredDiscountCode = {
+  __typename?: 'EnteredDiscountCode';
+  /** The discount code. */
+  code: Scalars['String']['output'];
+  /**
+   * Indicates whether the entered discount code can be rejected.
+   *
+   * A discount code can't be rejected if it's associated with a discount that has already been applied to the cart.
+   */
+  rejectable: Scalars['Boolean']['output'];
+};
+
 /** An operation that selects which entered discount codes to accept. Use this to validate discount codes from external systems. */
 export type EnteredDiscountCodesAcceptOperation = {
   /** The list of discount codes to accept. */
   codes: Array<DiscountCode>;
+};
+
+/**
+ * An operation that rejects entered discount codes with a custom message. Use this
+ * to conditionally reject discount codes based on business logic. This operation
+ * can only be used if the function is backed by an automatic discount.
+ */
+export type EnteredDiscountCodesRejectOperation = {
+  /** The list of discount codes to reject. */
+  codes: Array<RejectedDiscountCode>;
+  /** The custom message to display to the customer when the discount codes are rejected. */
+  message: Scalars['String']['input'];
 };
 
 /** A fixed amount value. */
@@ -1862,21 +1952,24 @@ export type Input = {
   cart: Cart;
   /**
    * The discount node that owns the [Shopify
-   * Function](https://shopify.dev/docs/apps/build/functions)). Discounts are a way
+   * Function](https://shopify.dev/docs/apps/build/functions). Discounts are a way
    * for merchants to promote sales and special offers, or as customer loyalty
    * rewards. A single discount can be automatic or code-based, and can be applied
    * to a cart lines, orders, and delivery.
    */
   discount: Discount;
   /**
-   * The discount codes that customers enter at checkout. Customers can enter codes
-   * as an array of strings, excluding gift cards.
-   * Codes aren't validated in any way other than to verify they aren't gift cards.
+   * Discount codes entered by the buyer at checkout, excluding gift cards. For
+   * cart.lines.discounts.generate.run and cart.delivery-options.discounts.generate.run targets, these
+   * discount codes are validated to ensure they are not deleted, maintain an active status, and are eligible
+   * for the current cart. For fetch targets, all entered discount codes are included, excluding gift cards.
    */
-  enteredDiscountCodes: Array<Scalars['String']['output']>;
+  enteredDiscountCodes: Array<EnteredDiscountCode>;
   /**
    * The result of the fetch target. Refer to [network access](https://shopify.dev/apps/build/functions/input-output/network-access/graphql)
-   * for Shopify Functions.
+   * for Shopify Functions. This input is only available in the
+   * `cart.lines.discounts.generate.run` and
+   * `cart.delivery-options.discounts.generate.run` extension targets.
    */
   fetchResult?: Maybe<HttpResponse>;
   /**
@@ -1899,7 +1992,7 @@ export type Input = {
    */
   shop: Shop;
   /**
-   * The discount code entered by a customer, which caused the [Discount Function](https://shopify.dev/docs/apps/build/discounts#build-with-shopify-functions)) to run.
+   * The discount code entered by a customer, which caused the [Discount Function](https://shopify.dev/docs/apps/build/discounts#build-with-shopify-functions) to run.
    * This input is only available in the `cart.lines.discounts.generate.run` and
    * `cart.delivery-options.discounts.generate.run` extension targets.
    */
@@ -2400,6 +2493,63 @@ export enum LocalizedFieldKey {
   TaxEmailIt = 'TAX_EMAIL_IT'
 }
 
+/** Represents the location where the inventory resides. */
+export type Location = HasMetafields & {
+  __typename?: 'Location';
+  /** The address of this location. */
+  address: LocationAddress;
+  /** The location handle. */
+  handle: Scalars['Handle']['output'];
+  /** The location id. */
+  id: Scalars['ID']['output'];
+  /**
+   * A [custom field](https://shopify.dev/docs/apps/build/custom-data) that stores additional information
+   * about a Shopify resource, such as products, orders, and
+   * [many more](https://shopify.dev/docs/api/admin-graphql/latest/enums/MetafieldOwnerType).
+   * Using [metafields with Shopify Functions](https://shopify.dev/docs/apps/build/functions/input-output/metafields-for-input-queries)
+   * enables you to customize the checkout experience.
+   */
+  metafield?: Maybe<Metafield>;
+  /** The name of the location. */
+  name: Scalars['String']['output'];
+};
+
+
+/** Represents the location where the inventory resides. */
+export type LocationMetafieldArgs = {
+  key: Scalars['String']['input'];
+  namespace?: InputMaybe<Scalars['String']['input']>;
+};
+
+/** Represents the address of a location. */
+export type LocationAddress = {
+  __typename?: 'LocationAddress';
+  /** The first line of the address for the location. */
+  address1?: Maybe<Scalars['String']['output']>;
+  /** The second line of the address for the location. */
+  address2?: Maybe<Scalars['String']['output']>;
+  /** The city of the location. */
+  city?: Maybe<Scalars['String']['output']>;
+  /** The country of the location. */
+  country?: Maybe<Scalars['String']['output']>;
+  /** The country code of the location. */
+  countryCode?: Maybe<Scalars['String']['output']>;
+  /** A formatted version of the address for the location. */
+  formatted: Array<Scalars['String']['output']>;
+  /** The approximate latitude coordinates of the location. */
+  latitude?: Maybe<Scalars['Float']['output']>;
+  /** The approximate longitude coordinates of the location. */
+  longitude?: Maybe<Scalars['Float']['output']>;
+  /** The phone number of the location. */
+  phone?: Maybe<Scalars['String']['output']>;
+  /** The province of the location. */
+  province?: Maybe<Scalars['String']['output']>;
+  /** The code for the province, state, or district of the address of the location. */
+  provinceCode?: Maybe<Scalars['String']['output']>;
+  /** The ZIP code of the location. */
+  zip?: Maybe<Scalars['String']['output']>;
+};
+
 /** Represents a mailing address. */
 export type MailingAddress = {
   __typename?: 'MailingAddress';
@@ -2529,7 +2679,11 @@ export type Metafield = {
   value: Scalars['String']['output'];
 };
 
-/** A precise monetary value and its associated currency. For example, 12.99 USD. */
+/**
+ * A precise monetary value and its associated currency. Combines a decimal amount
+ * with a three-letter currency code to express prices, costs, and other financial
+ * values throughout the API. For example, 12.99 USD.
+ */
 export type MoneyV2 = {
   __typename?: 'MoneyV2';
   /**
@@ -2584,13 +2738,19 @@ export type MutationRootCartLinesDiscountsGenerateRunArgs = {
 
 /** A discount candidate to be applied to an eligible order. */
 export type OrderDiscountCandidate = {
-  /** The discount code associated with this discount candidate, for code-based discounts. */
+  /**
+   * An optional discount code associated with this discount candidate, for use
+   * with automatic discounts. If a code discount is the function trigger, the
+   * associated discount code will be overwritten by the triggering discount code.
+   */
   associatedDiscountCode?: InputMaybe<AssociatedDiscountCode>;
   /** The conditions that must be satisfied for an order to be eligible for a discount candidate. */
   conditions?: InputMaybe<Array<Condition>>;
   /**
-   * A notification that informs customers about available discounts.
-   * The message is displayed on the **Cart** page. For example, "Save 20% on all t-shirts."
+   * A notification on the **Cart** page informs customers about available
+   * discounts. If an automatic discount applies, the notification displays this
+   * message, such as "Save 20% on all t-shirts." If a discount code is entered,
+   * the notification displays the code instead.
    */
   message?: InputMaybe<Scalars['String']['input']>;
   /** The targets of the order discount candidate. */
@@ -2635,7 +2795,7 @@ export type OrderDiscountsAddOperation = {
 export type OrderMinimumSubtotal = {
   /** Cart line IDs with a merchandise line price that's excluded to calculate the minimum subtotal amount of the order. */
   excludedCartLineIds: Array<Scalars['ID']['input']>;
-  /** The minimum subtotal amount of the order to be eligible for the discount. */
+  /** The minimum subtotal amount of the order to be eligible for the discount in the shop's currency. */
   minimumAmount: Scalars['Decimal']['input'];
 };
 
@@ -2682,10 +2842,7 @@ export type Product = HasMetafields & {
    * from the list to return `true`.
    */
   hasAnyTag: Scalars['Boolean']['output'];
-  /**
-   * Whether the product is associated with the specified tags. The product must have all of the tags in the list
-   * to return `true`.
-   */
+  /** Whether the product is associated with the specified tags. */
   hasTags: Array<HasTagResponse>;
   /**
    * A [globally-unique ID](https://shopify.dev/docs/api/usage/gids)
@@ -2799,11 +2956,17 @@ export type ProductMetafieldArgs = {
 
 /** The target and value of the discount to be applied to a cart line. */
 export type ProductDiscountCandidate = {
-  /** The discount code associated with this discount candidate, for code-based discounts. */
+  /**
+   * An optional discount code associated with this discount candidate, for use
+   * with automatic discounts. If a code discount is the function trigger, the
+   * associated discount code will be overwritten by the triggering discount code.
+   */
   associatedDiscountCode?: InputMaybe<AssociatedDiscountCode>;
   /**
-   * A notification that informs customers about available discounts.
-   * The message is displayed on the **Cart** page. For example, "Save 20% on all t-shirts."
+   * A notification on the **Cart** page informs customers about available
+   * discounts. If an automatic discount applies, the notification displays this
+   * message, such as "Save 20% on all t-shirts." If a discount code is entered,
+   * the notification displays the code instead.
    */
   message?: InputMaybe<Scalars['String']['input']>;
   /** The targets of the discount to be applied to a cart line. */
@@ -2952,6 +3115,12 @@ export type PurchasingCompany = {
   location: CompanyLocation;
 };
 
+/** A discount code to be rejected. */
+export type RejectedDiscountCode = {
+  /** The discount code to reject. */
+  code: Scalars['String']['input'];
+};
+
 /** Represents how products and variants can be sold and purchased. */
 export type SellingPlan = HasMetafields & {
   __typename?: 'SellingPlan';
@@ -3067,9 +3236,9 @@ export enum WeightUnit {
 export type InputVariables = Exact<{ [key: string]: never; }>;
 
 
-export type Input = { __typename?: 'Input', cart: { __typename?: 'Cart', deliveryGroups: Array<{ __typename?: 'CartDeliveryGroup', id: string, deliveryOptions: Array<{ __typename?: 'CartDeliveryOption', handle: any, title?: string | null, cost: { __typename?: 'MoneyV2', amount: any, currencyCode: CurrencyCode } }> }> }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, metafield?: { __typename?: 'Metafield', value: string } | null }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, market: { __typename?: 'Market', id: string } }, shop: { __typename?: 'Shop', localTime: { __typename?: 'LocalTime', date: any } } };
+export type Input = { __typename?: 'Input', cart: { __typename?: 'Cart', deliveryGroups: Array<{ __typename?: 'CartDeliveryGroup', id: string, deliveryOptions: Array<{ __typename?: 'CartDeliveryOption', handle: any, title?: string | null, cost: { __typename?: 'MoneyV2', amount: any, currencyCode: CurrencyCode } }> }> }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, metafield?: { __typename?: 'Metafield', value: string } | null }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, language: { __typename?: 'Language', isoCode: LanguageCode }, market: { __typename?: 'Market', id: string } }, shop: { __typename?: 'Shop', localTime: { __typename?: 'LocalTime', date: any } } };
 
 export type CartLineDiscountInputVariables = Exact<{ [key: string]: never; }>;
 
 
-export type CartLineDiscountInput = { __typename?: 'Input', cart: { __typename?: 'Cart', lines: Array<{ __typename?: 'CartLine', id: string, quantity: number, cost: { __typename?: 'CartLineCost', subtotalAmount: { __typename?: 'MoneyV2', amount: any }, compareAtAmountPerQuantity?: { __typename?: 'MoneyV2', amount: any } | null } }> }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, market: { __typename?: 'Market', id: string } }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, configuration?: { __typename?: 'Metafield', value: string } | null }, shop: { __typename?: 'Shop', localTime: { __typename?: 'LocalTime', date: any } } };
+export type CartLineDiscountInput = { __typename?: 'Input', cart: { __typename?: 'Cart', lines: Array<{ __typename?: 'CartLine', id: string, quantity: number, cost: { __typename?: 'CartLineCost', subtotalAmount: { __typename?: 'MoneyV2', amount: any }, compareAtAmountPerQuantity?: { __typename?: 'MoneyV2', amount: any } | null } }> }, localization: { __typename?: 'Localization', country: { __typename?: 'Country', isoCode: CountryCode }, language: { __typename?: 'Language', isoCode: LanguageCode }, market: { __typename?: 'Market', id: string } }, discount: { __typename?: 'Discount', discountClasses: Array<DiscountClass>, configuration?: { __typename?: 'Metafield', value: string } | null }, shop: { __typename?: 'Shop', localTime: { __typename?: 'LocalTime', date: any } } };

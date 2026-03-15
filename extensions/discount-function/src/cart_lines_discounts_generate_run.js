@@ -9,7 +9,7 @@ import {
  */
 
 export function cartLinesDiscountsGenerateRun(input) {
-  const { cart, discount, localization, shop, triggeringDiscountCode } = input;
+  const { cart, discount, localization, shop } = input;
 
   if (!cart.lines.length) {
     return { operations: [] };
@@ -50,16 +50,14 @@ export function cartLinesDiscountsGenerateRun(input) {
   }
 
   if (!marketConfig) {
-    console.log("No matching market configuration found");
     return { operations: [] };
   }
 
   if (!isValidDateRange(marketConfig, shop)) {
-    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
 
-  const message = triggeringDiscountCode || configuration.title || "Discount";
+  const message = configuration.title || "Discount";
 
   let discountValue;
   if (marketConfig.cartLineType === "percentage") {
@@ -83,10 +81,15 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   const eligibleLines = cart.lines.filter((line) => {
     if (marketConfig.excludeOnSale) {
-      return (
-        line.cost.compareAtAmountPerQuantity == null ||
-        Number(line.cost.compareAtAmountPerQuantity.amount) <= 0
-      );
+      const compareAt = line.cost.compareAtAmountPerQuantity
+        ? Number(line.cost.compareAtAmountPerQuantity.amount)
+        : 0;
+      const price = line.quantity > 0
+        ? Number(line.cost.subtotalAmount.amount) / line.quantity
+        : 0;
+      if (compareAt > 0 && compareAt > price) {
+        return false;
+      }
     }
     return true;
   });

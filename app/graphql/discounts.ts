@@ -1,10 +1,7 @@
 // Queries
 export const GET_ALL_DISCOUNTS = `
   query GetAllDiscounts {
-    discountNodes(
-      first: 50,
-      query: "app:example-discounts--ui-extension"
-    ) {
+    discountNodes(first: 50) {
       nodes {
         id
         discount {

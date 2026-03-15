@@ -14,7 +14,7 @@ function run_default(userfunction) {
 
 // extensions/discount-function/src/cart_lines_discounts_generate_run.js
 function cartLinesDiscountsGenerateRun(input) {
-  const { cart, discount, localization, shop, triggeringDiscountCode } = input;
+  const { cart, discount, localization, shop } = input;
   if (!cart.lines.length) {
     return { operations: [] };
   }
@@ -48,14 +48,12 @@ function cartLinesDiscountsGenerateRun(input) {
     }
   }
   if (!marketConfig) {
-    console.log("No matching market configuration found");
     return { operations: [] };
   }
   if (!isValidDateRange(marketConfig, shop)) {
-    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
-  const message = triggeringDiscountCode || configuration.title || "Discount";
+  const message = configuration.title || "Discount";
   let discountValue;
   if (marketConfig.cartLineType === "percentage") {
     discountValue = {
@@ -76,7 +74,11 @@ function cartLinesDiscountsGenerateRun(input) {
   }
   const eligibleLines = cart.lines.filter((line) => {
     if (marketConfig.excludeOnSale) {
-      return line.cost.compareAtAmountPerQuantity == null || Number(line.cost.compareAtAmountPerQuantity.amount) <= 0;
+      const compareAt = line.cost.compareAtAmountPerQuantity ? Number(line.cost.compareAtAmountPerQuantity.amount) : 0;
+      const price = line.quantity > 0 ? Number(line.cost.subtotalAmount.amount) / line.quantity : 0;
+      if (compareAt > 0 && compareAt > price) {
+        return false;
+      }
     }
     return true;
   });
@@ -136,7 +138,7 @@ function isValidDateRange2(marketConfig, shop) {
   return startDate <= now && endDate >= now;
 }
 function cartDeliveryOptionsDiscountsGenerateRun(input) {
-  const { cart, discount, localization, shop, triggeringDiscountCode } = input;
+  const { cart, discount, localization, shop } = input;
   const firstDeliveryGroup = cart.deliveryGroups[0];
   if (!firstDeliveryGroup) {
     throw new Error("No delivery groups found");
@@ -171,11 +173,9 @@ function cartDeliveryOptionsDiscountsGenerateRun(input) {
     }
   }
   if (!marketConfig) {
-    console.log("No matching market configuration found");
     return { operations: [] };
   }
   if (!isValidDateRange2(marketConfig, shop)) {
-    console.log("Market configuration date range is not valid");
     return { operations: [] };
   }
   const deliveryType = marketConfig.deliveryType || "percentage";
@@ -185,7 +185,7 @@ function cartDeliveryOptionsDiscountsGenerateRun(input) {
   };
   const deliveryPercentage = safeNumber(marketConfig.deliveryPercentage);
   const deliveryFixed = safeNumber(marketConfig.deliveryFixed);
-  const message = triggeringDiscountCode || configuration.title;
+  const message = configuration.title;
   const candidates = firstDeliveryGroup.deliveryOptions.map((option) => {
     let value;
     if (deliveryType === "fixed" && deliveryFixed > 0) {

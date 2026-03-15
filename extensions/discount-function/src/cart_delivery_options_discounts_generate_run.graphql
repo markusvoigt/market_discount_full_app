@@ -25,6 +25,9 @@ query Input {
     country {
       isoCode
     }
+    language {
+      isoCode
+    }
     market {
       id
     }

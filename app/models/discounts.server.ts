@@ -432,17 +432,7 @@ export async function getDiscounts(request: Request) {
   const json = await response.json();
   
   return json.data.discountNodes.nodes.filter((node: DiscountNode) => {
-    if (!node.metafield?.value) return false;
-
-    const now = new Date();
-    const startDate = new Date(node.discount.startsAt);
-    const endDate = node.discount.endsAt ? new Date(node.discount.endsAt) : null;
-
-    const isActive = node.discount.status === 'ACTIVE' || node.discount.status === 'SCHEDULED';
-    const hasNotExpired = !endDate || endDate > now;
-    const hasStarted = startDate <= now;
-
-    return isActive && hasNotExpired && hasStarted;
+    return !!node.metafield?.value;
   });
 }
 

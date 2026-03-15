@@ -17,6 +17,9 @@ query CartLineDiscountInput {
     country {
       isoCode
     }
+    language {
+      isoCode
+    }
     market {
       id
     }
