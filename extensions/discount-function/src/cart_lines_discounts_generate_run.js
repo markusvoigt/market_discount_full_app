@@ -27,9 +27,8 @@ export function cartLinesDiscountsGenerateRun(input) {
   if (discount.configuration?.value) {
     try {
       configuration = JSON.parse(discount.configuration.value);
-    } catch (e) {
-      console.error("Failed to parse metafield configuration:", e);
-      configuration = {};
+    } catch {
+      return { operations: [] };
     }
   }
 

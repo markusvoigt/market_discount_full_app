@@ -1,7 +1,11 @@
 // Queries
 export const GET_ALL_DISCOUNTS = `
-  query GetAllDiscounts {
-    discountNodes(first: 50) {
+  query GetAllDiscounts($first: Int!, $after: String) {
+    discountNodes(
+      first: $first,
+      after: $after,
+      query: "app:discount-function"
+    ) {
       nodes {
         id
         discount {
@@ -31,11 +35,15 @@ export const GET_ALL_DISCOUNTS = `
           }
         }
         metafield(
-          namespace: "$app:example-discounts--ui-extension"
+          namespace: "$app:discount-function"
           key: "function-configuration"
         ) {
           value
         }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }

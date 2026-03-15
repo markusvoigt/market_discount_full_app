@@ -84,7 +84,7 @@ export function useDiscountForm({
   );
 
   const setConfigField = useCallback(
-    (field: keyof DiscountFormState["configuration"], value: any) => {
+    (field: keyof DiscountFormState["configuration"], value: DiscountFormState["configuration"][keyof DiscountFormState["configuration"]]) => {
       setFormState((prev) => ({
         ...prev,
         configuration: { ...prev.configuration, [field]: value },
@@ -94,7 +94,7 @@ export function useDiscountForm({
   );
 
   const setMarketConfigField = useCallback(
-    (marketId: string, field: keyof MarketConfig, value: any) => {
+    (marketId: string, field: keyof MarketConfig, value: MarketConfig[keyof MarketConfig]) => {
       setFormState((prev) => ({
         ...prev,
         configuration: {

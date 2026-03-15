@@ -3,21 +3,24 @@ import { cartLinesDiscountsGenerateRun } from "./cart_lines_discounts_generate_r
 import { DiscountClass } from "../generated/api";
 
 describe("Market-specific discounts", () => {
+  const shopWithDate = {
+    localTime: { date: "2025-07-01" },
+  };
+
   const baseInput = {
     cart: {
       lines: [
         {
           id: "gid://shopify/CartLine/0",
+          quantity: 1,
           cost: {
             subtotalAmount: {
               amount: "1914.0",
             },
+            compareAtAmountPerQuantity: null,
           },
         },
       ],
-      buyerIdentity: {
-        presentmentCurrencyCode: "CAD",
-      },
     },
     localization: {
       market: {
@@ -27,6 +30,7 @@ describe("Market-specific discounts", () => {
         isoCode: "CA",
       },
     },
+    shop: shopWithDate,
     discount: {
       discountClasses: [DiscountClass.Product],
       configuration: {
@@ -37,6 +41,7 @@ describe("Market-specific discounts", () => {
               marketId: "gid://shopify/Market/103251444094",
               marketName: "Canada",
               currencyCode: "CAD",
+              countryCode: "CA",
               cartLineType: "fixed",
               cartLinePercentage: "0",
               cartLineFixed: "10",
@@ -54,6 +59,7 @@ describe("Market-specific discounts", () => {
               marketId: "gid://shopify/Market/103251411326",
               marketName: "Germany",
               currencyCode: "EUR",
+              countryCode: "DE",
               cartLineType: "fixed",
               cartLinePercentage: "0",
               cartLineFixed: "5",
@@ -82,7 +88,8 @@ describe("Market-specific discounts", () => {
           {
             value: {
               fixedAmount: {
-                amount: "10.0",
+                amount: 10,
+                appliesToEachItem: true,
               },
             },
             targets: [
@@ -105,11 +112,8 @@ describe("Market-specific discounts", () => {
         market: {
           id: "gid://shopify/Market/103251411326",
         },
-      },
-      cart: {
-        ...baseInput.cart,
-        buyerIdentity: {
-          presentmentCurrencyCode: "EUR",
+        country: {
+          isoCode: "DE",
         },
       },
     };
@@ -122,7 +126,8 @@ describe("Market-specific discounts", () => {
           {
             value: {
               fixedAmount: {
-                amount: "5.0",
+                amount: 5,
+                appliesToEachItem: true,
               },
             },
             targets: [
@@ -138,12 +143,15 @@ describe("Market-specific discounts", () => {
     });
   });
 
-  it("falls back to currency match when market ID not found", () => {
+  it("falls back to country code match when market ID not found", () => {
     const fallbackInput = {
       ...baseInput,
       localization: {
         market: {
           id: "gid://shopify/Market/nonexistent",
+        },
+        country: {
+          isoCode: "CA",
         },
       },
     };
@@ -156,7 +164,8 @@ describe("Market-specific discounts", () => {
           {
             value: {
               fixedAmount: {
-                amount: "10.0",
+                amount: 10,
+                appliesToEachItem: true,
               },
             },
           },
@@ -172,11 +181,8 @@ describe("Market-specific discounts", () => {
         market: {
           id: "gid://shopify/Market/nonexistent",
         },
-      },
-      cart: {
-        ...baseInput.cart,
-        buyerIdentity: {
-          presentmentCurrencyCode: "USD",
+        country: {
+          isoCode: "JP",
         },
       },
     };

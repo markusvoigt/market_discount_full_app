@@ -48,12 +48,11 @@ export function cartDeliveryOptionsDiscountsGenerateRun(input) {
   }
 
   let configuration = {};
-  if (discount.metafield?.value) {
+  if (discount.configuration?.value) {
     try {
-      configuration = JSON.parse(discount.metafield.value);
-    } catch (e) {
-      console.error("Failed to parse metafield configuration:", e);
-      configuration = {};
+      configuration = JSON.parse(discount.configuration.value);
+    } catch {
+      return { operations: [] };
     }
   }
 

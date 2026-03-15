@@ -27,7 +27,7 @@ query CartLineDiscountInput {
   discount {
     discountClasses
     configuration: metafield(
-      namespace: "$app:example-discounts--ui-extension"
+      namespace: "$app:discount-function"
       key: "function-configuration"
     ) {
       value
